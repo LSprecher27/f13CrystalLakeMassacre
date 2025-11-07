@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crystal Lake Nightmare (8-Bit)</title>
+    <!-- Link to external CSS file for styling -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div id="game-container">
+        <h1>CRYSTAL LAKE NIGHTMARE</h1>
+        
+        <!-- Main Menu Screen (Visible on startup) -->
+        <div id="main-menu" class="screen" style="display: flex;">
+            <button class="menu-button" onclick="showScreen('jason-selector-screen')">Start Game</button>
+            <button class="menu-button">Options (WIP)</button>
+            <button class="menu-button">Credits (WIP)</button>
+        </div>
+
+        <!-- Jason Selector Screen -->
+        <div id="jason-selector-screen" class="screen">
+            <h2>Select Jason</h2>
+            <div id="jason-list">
+                <!-- Jason 1 (Default) -->
+                <div id="jason-1" class="jason-card unlocked" data-jason-id="1">
+                    <p>Classic Jason</p>
+                    <p style="font-size:0.5rem; color: #aaa;">(Unlocked)</p>
+                </div>
+                <!-- Placeholder for future Jasons -->
+                <div class="jason-card" data-jason-id="2">
+                    <p>Part 3 Jason</p>
+                    <p style="font-size:0.5rem; color: #aaa;">(LOCKED)</p>
+                </div>
+            </div>
+            <button class="menu-button" onclick="startGame(1)">Begin Hunt</button>
+            <button class="menu-button" onclick="showScreen('main-menu')">Back</button>
+        </div>
+
+        <!-- Game Screen (Hidden on startup) -->
+        <div id="game-screen" class="screen">
+            
+            <!-- Game Canvas -->
+            <canvas id="game-canvas"></canvas>
+
+            <!-- Game UI Panel -->
+            <div id="game-ui">
+                <!-- Health Section -->
+                <div class="ui-section">
+                    <div class="stat-label">JASON'S HEALTH</div>
+                    <div id="health-bar-container">
+                        <div id="health-bar-fill" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <!-- Ability Section -->
+                <div class="ui-section">
+                    <div class="stat-label">ABILITIES</div>
+                    <button id="ability-dash" class="ability-button">Dash (Q)</button>
+                    <button id="ability-vision" class="ability-button">Vision (W)</button>
+                    <button id="ability-teleport" class="ability-button">Teleport (E)</button>
+                    <button id="ability-rage" class="ability-button">Rage (R)</button>
+                </div>
+                
+                <!-- Counselors Left/Goal Status -->
+                <div class="ui-section">
+                    <div class="stat-label">COUNSELORS LEFT: <span id="counselor-count" class="stat-value">7</span></div>
+                    <div class="stat-label">ESCAPE STATUS: <span id="escape-status" class="stat-value">Unprepared</span></div>
+                </div>
+            </div>
+        </div> <!-- End of game-screen -->
+        
+        <!-- Link to external JavaScript file for game logic -->
+        <script src="game.js"></script>
+    </div>
+
+</body>
+</html>
