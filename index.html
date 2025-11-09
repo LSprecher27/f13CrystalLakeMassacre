@@ -4,8 +4,253 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crystal Lake Nightmare (8-Bit)</title>
-    <!-- Link to external CSS file for styling -->
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+/* ---------------------------------
+   Step 10: Friday 13th 8-Bit CSS Styling
+   --------------------------------- */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+    /* 8-bit Color Palette: Dark, Gritty, and Blood-themed */
+    --color-dark: #12100e;   /* Almost black */
+    --color-blood: #881c1c;  /* Deep crimson */
+    --color-wood: #4a342a;   /* Cabin wood/Brown */
+    --color-moss: #2c4a2a;   /* Forest green/Moss */
+    --color-text: #e0e0e0;   /* Off-white retro text */
+    --color-accent: #7a7a7a; /* Grey/Metallic accent */
+    --color-dead: #333;      /* Gray for dead bodies */
+    --canvas-size: min(80vh, 80vw); /* Responsive canvas sizing */
+}
+
+/* Base Body and Layout */
+body {
+    font-family: 'Press Start 2P', monospace;
+    background-color: var(--color-dark);
+    color: var(--color-text);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+/* Main Game Container - The Arcade Cabinet Look */
+#game-container {
+    width: 95vw;
+    max-width: 1200px;
+    border: 8px solid var(--color-wood);
+    background-color: #1a1a1a;
+    /* Retro 3D effect/border shadow */
+    box-shadow: 0 0 0 4px var(--color-moss), 0 0 0 12px var(--color-dark);
+    padding: 20px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+/* Title Styling - Aggressive/Bloody look */
+h1 {
+    font-size: 1.5rem;
+    color: var(--color-blood);
+    text-shadow: 4px 4px 0px var(--color-dark); /* Heavy 8-bit drop shadow */
+    margin-bottom: 20px;
+}
+h2 {
+    font-size: 1rem;
+    margin-bottom: 20px;
+}
+
+/* ------------------ UI Screens and Buttons ------------------ */
+
+.screen {
+    width: 100%;
+    display: none; /* Controlled by JavaScript */
+    flex-direction: column;
+    align-items: center;
+}
+
+#main-menu, #jason-selector-screen {
+    padding: 40px 20px;
+}
+
+/* Menu Buttons */
+.menu-button {
+    background-color: var(--color-blood);
+    color: var(--color-text);
+    border: 4px solid var(--color-wood);
+    padding: 12px 24px;
+    margin: 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    box-shadow: 4px 4px 0px var(--color-dark);
+    transition: all 0.1s;
+}
+
+.menu-button:hover {
+    background-color: #a32424;
+    box-shadow: 2px 2px 0px var(--color-dark);
+    transform: translate(2px, 2px); /* Click/press effect */
+}
+
+/* Jason Selector Cards */
+.jason-card {
+    background-color: var(--color-wood);
+    border: 4px solid var(--color-dark);
+    padding: 15px;
+    margin: 10px;
+    width: 150px;
+    cursor: pointer;
+    display: inline-block;
+    box-shadow: 4px 4px 0px var(--color-dark);
+    opacity: 0.5; /* Locked state visual */
+}
+
+.jason-card.unlocked {
+    opacity: 1;
+    border-color: var(--color-blood);
+}
+
+.jason-card.unlocked:hover {
+    background-color: #5c443b;
+}
+
+/* ------------------ Game Screen Layout ------------------ */
+#game-screen {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    justify-content: center;
+    width: 100%;
+}
+
+#game-canvas {
+    background-color: var(--color-moss);
+    border: 4px solid var(--color-dark);
+    image-rendering: pixelated; /* CRITICAL for 8-bit look */
+    width: var(--canvas-size);
+    height: var(--canvas-size);
+    min-width: 300px;
+    min-height: 300px;
+    box-sizing: content-box;
+}
+
+/* Game UI Panel */
+#game-ui {
+    width: 200px;
+    background-color: var(--color-wood);
+    border: 4px solid var(--color-dark);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.ui-section {
+    margin-bottom: 15px;
+    padding: 5px;
+    width: 100%;
+    border-bottom: 2px dashed var(--color-accent);
+}
+
+.ui-section:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    font-size: 0.6rem;
+    margin-bottom: 5px;
+    text-align: left;
+    width: 100%;
+    color: var(--color-accent);
+}
+.stat-value {
+    font-size: 0.7rem;
+    color: var(--color-blood);
+    text-shadow: 1px 1px 0 var(--color-dark);
+}
+
+/* Health Bar */
+#health-bar-container {
+    border: 2px solid var(--color-dark); 
+    background-color: #333;
+    width: 100%;
+}
+
+#health-bar-fill {
+    height: 12px;
+    background-color: var(--color-blood);
+    transition: width 0.3s;
+}
+
+/* Ability Buttons */
+.ability-button {
+    background-color: var(--color-dark);
+    color: var(--color-text);
+    border: 2px solid var(--color-accent);
+    padding: 8px;
+    margin-top: 5px;
+    width: 100%;
+    cursor: pointer;
+    font-size: 0.6rem;
+    line-height: 1;
+}
+
+.ability-button.cooldown {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #333;
+    color: var(--color-accent);
+}
+
+.ability-button:not(.cooldown):hover {
+    background-color: #3f3f3f;
+}
+
+/* ------------------ Mobile Responsiveness ------------------ */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 1rem;
+    }
+    .menu-button {
+        font-size: 0.6rem;
+        padding: 10px 18px;
+    }
+    #game-screen {
+        flex-direction: column;
+        gap: 10px;
+    }
+    #game-canvas {
+        width: 100%;
+        height: 50vh;
+        max-width: none;
+        max-height: none;
+    }
+    #game-ui {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        border-top: 4px solid var(--color-dark);
+        border-left: 0;
+        border-right: 0;
+        padding: 10px 0;
+    }
+    .ui-section {
+        width: 45%;
+        margin-bottom: 5px;
+        border-bottom: none;
+    }
+}
+    </style>
 </head>
 <body>
 
@@ -14,7 +259,7 @@
         
         <!-- Main Menu Screen (Visible on startup) -->
         <div id="main-menu" class="screen" style="display: flex;">
-            <button class="menu-button" onclick="showScreen('jason-selector-screen')">Start Game</button>
+            <button class="menu-button" onclick="window.showScreen('jason-selector-screen')">Start Game</button>
             <button class="menu-button">Options (WIP)</button>
             <button class="menu-button">Credits (WIP)</button>
         </div>
@@ -34,8 +279,8 @@
                     <p style="font-size:0.5rem; color: #aaa;">(LOCKED)</p>
                 </div>
             </div>
-            <button class="menu-button" onclick="startGame(1)">Begin Hunt</button>
-            <button class="menu-button" onclick="showScreen('main-menu')">Back</button>
+            <button class="menu-button" onclick="window.startGame(1)">Begin Hunt</button>
+            <button class="menu-button" onclick="window.showScreen('main-menu')">Back</button>
         </div>
 
         <!-- Game Screen (Hidden on startup) -->
@@ -56,13 +301,19 @@
 
                 <!-- Ability Section -->
                 <div class="ui-section">
-                    <div class="stat-label">ABILITIES</div>
-                    <button id="ability-dash" class="ability-button">Dash (Q)</button>
-                    <button id="ability-vision" class="ability-button">Vision (W)</button>
-                    <button id="ability-teleport" class="ability-button">Teleport (E)</button>
-                    <button id="ability-rage" class="ability-button">Rage (R)</button>
+                    <div class="stat-label">ATTACK/ABILITIES</div>
+                    <button id="ability-attack" class="ability-button" onclick="window.handleAbility('attack')">Attack (Space)</button>
+                    <button id="ability-dash" class="ability-button" onclick="window.handleAbility('dash')">Dash (Q)</button>
+                    <button id="ability-vision" class="ability-button" onclick="window.handleAbility('vision')">Vision (V)</button>
+                    <button id="ability-teleport" class="ability-button" onclick="window.handleAbility('teleport')">Teleport (E)</button>
+                    <button id="ability-rage" class="ability-button" onclick="window.handleAbility('rage')">Rage (R)</button>
                 </div>
                 
+                <!-- Ability Status -->
+                <div class="ui-section">
+                    <div class="stat-label">ABILITY STATUS: <span id="ability-status" class="stat-value">Normal</span></div>
+                </div>
+
                 <!-- Counselors Left/Goal Status -->
                 <div class="ui-section">
                     <div class="stat-label">COUNSELORS LEFT: <span id="counselor-count" class="stat-value">7</span></div>
@@ -71,9 +322,757 @@
             </div>
         </div> <!-- End of game-screen -->
         
-        <!-- Link to external JavaScript file for game logic -->
-        <script src="game.js"></script>
     </div>
 
 </body>
+<script type="module">
+// ---------------------------------
+// Counselor AI Module 
+// ---------------------------------
+
+export const COUNSELOR_SIZE = 24; // Counselors are slightly smaller than Jason (64)
+
+// Defines the base properties for an AI Counselor
+const baseCounselor = {
+    x: 0,
+    y: 0,
+    size: COUNSELOR_SIZE, 
+    speed: 2, // Slower than Jason
+    health: 100, // Counselors need 2 hits to die (50 damage per hit)
+    isAlive: true,
+    targetX: 0,
+    targetY: 0,
+    state: 'wandering', // States: 'wandering', 'escaping', 'repairing', 'dead'
+    isLoud: false, 
+    inventory: {
+        battery: false,
+        gas: false,
+        keys: false,
+        radio: false,
+        machete: false, 
+    }
+};
+
+/**
+ * Creates a counselor object with random properties and position.
+ */
+function createCounselor(mapWidth, mapHeight, isTommy = false) {
+    const counselor = { ...baseCounselor };
+
+    // Spawn randomly outside the central cabin area (150x150 center)
+    const centerX = mapWidth / 2;
+    const centerY = mapHeight / 2;
+    const cabinRadius = 75; // Half of cabin size
+
+    let x, y;
+    do {
+        // Random position within map bounds
+        x = Math.random() * (mapWidth - counselor.size);
+        y = Math.random() * (mapHeight - counselor.size);
+    } while (
+        x > centerX - cabinRadius && 
+        x < centerX + cabinRadius && 
+        y > centerY - cabinRadius && 
+        y < centerY + cabinRadius
+    ); // Reroll if spawned inside the cabin
+
+    counselor.x = x;
+    counselor.y = y;
+    counselor.targetX = x;
+    counselor.targetY = y;
+    
+    if (isTommy) {
+        counselor.inventory.machete = true;
+        counselor.health = 150; // Tommy is tougher
+    }
+    
+    return counselor;
+}
+
+/**
+ * Creates an array of counselors.
+ */
+function createCounselors(count, mapWidth, mapHeight) {
+    const counselors = [];
+    for (let i = 0; i < count; i++) {
+        counselors.push(createCounselor(mapWidth, mapHeight));
+    }
+    return counselors;
+}
+
+/**
+ * Updates the state and position of a single counselor (simple wandering AI).
+ */
+function updateCounselor(counselor, mapWidth, mapHeight) {
+    if (!counselor.isAlive || counselor.state !== 'wandering') return;
+    
+    const dx = counselor.targetX - counselor.x;
+    const dy = counselor.targetY - counselor.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Check if counselor has reached target or needs a new one (randomly)
+    if (distance < counselor.speed || Math.random() < 0.01) {
+        // Set a new random target point
+        counselor.targetX = Math.random() * (mapWidth - counselor.size);
+        counselor.targetY = Math.random() * (mapHeight - counselor.size);
+    } else {
+        // Move towards the target
+        counselor.x += (dx / distance) * counselor.speed;
+        counselor.y += (dy / distance) * counselor.speed;
+    }
+    
+    // Keep counselor within map bounds
+    counselor.x = Math.max(0, Math.min(mapWidth - counselor.size, counselor.x));
+    counselor.y = Math.max(0, Math.min(mapHeight - counselor.size, counselor.y));
+}
+
+
+// ---------------------------------
+// Player Module (Jason)
+// ---------------------------------
+
+// --- 1. Global Player State and Input ---
+const MAP_WIDTH_P = 800; 
+const MAP_HEIGHT_P = 800;
+
+// Global variable to track if dash is currently active (used for speed reset)
+let isDashing = false;
+
+// Defines the main player character (Jason)
+const jason = {
+    x: MAP_WIDTH_P / 2, // Start in the center of the cabin map
+    y: MAP_HEIGHT_P / 2,
+    size: 64, 
+    frameWidth: 32, 
+    frameHeight: 64, 
+    baseSpeed: 3,
+    currentSpeed: 3,
+    health: 100,
+    maxHealth: 100,
+    currentJasonId: 1,
+    direction: 'down', 
+    isMoving: false,
+    
+    // Animation state
+    currentFrame: 0, 
+    frameTimer: 0,
+    frameDelay: 8, 
+    
+    // Attack state (NEW)
+    isAttacking: false,
+    attack: { cooldown: 60, cooldownTimer: 0 }, // 1 second cooldown
+    
+    // Ability state
+    isVisionActive: false,
+    isRageActive: false,
+    abilities: {
+        // Cooldown is in frames (60 frames = 1 second)
+        dash: { cooldown: 180, cooldownTimer: 0, duration: 60, durationTimer: 0 }, // 3s CD, 1s duration
+        vision: { cooldown: 480, cooldownTimer: 0, duration: 300, durationTimer: 0 }, // 8s CD, 5s duration
+        teleport: { cooldown: 600, cooldownTimer: 0, duration: 0, durationTimer: 0 }, // 10s CD
+        rage: { cooldown: 1800, cooldownTimer: 0, duration: 0, durationTimer: 0 } // 30s CD (only used once)
+    }
+};
+
+// Tracks key presses for smooth movement
+const keys = {
+    ArrowUp: false,
+    ArrowDown: false,
+    ArrowLeft: false,
+    ArrowRight: false,
+    w: false,
+    s: false,
+    a: false,
+    d: false,
+    ' ': false, // Spacebar for Attack (NEW)
+    q: false, // Dash
+    v: false, // Vision
+    e: false, // Teleport
+    r: false  // Rage
+};
+
+// --- SPRITESHEET DATA ---
+const FRAME_SIZE = 32;
+const ROW_SIZE = 64;
+
+const JASON_ANIMATIONS = {
+    'down': [
+        { sx: 0 * FRAME_SIZE, sy: 0 * ROW_SIZE },
+        { sx: 1 * FRAME_SIZE, sy: 0 * ROW_SIZE }
+    ],
+    'left': [
+        { sx: 0 * FRAME_SIZE, sy: 1 * ROW_SIZE },
+        { sx: 1 * FRAME_SIZE, sy: 1 * ROW_SIZE }
+    ],
+    'right': [
+        { sx: 0 * FRAME_SIZE, sy: 2 * ROW_SIZE },
+        { sx: 1 * FRAME_SIZE, sy: 2 * ROW_SIZE }
+    ],
+    'up': [
+        { sx: 0 * FRAME_SIZE, sy: 3 * ROW_SIZE },
+        { sx: 1 * FRAME_SIZE, sy: 3 * ROW_SIZE }
+    ]
+};
+
+// --- 2. Input Handling ---
+function handleKeyDown(event) {
+    const key = event.key.toLowerCase();
+    
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 's', 'a', 'd', ' '].includes(key)) {
+        event.preventDefault(); // Prevent page scroll on game keys
+    }
+    
+    if (keys.hasOwnProperty(key)) {
+        keys[key] = true;
+    }
+    // Handle Spacebar case specifically
+    if (event.key === ' ') {
+        keys[' '] = true;
+    }
+}
+
+function handleKeyUp(event) {
+    const key = event.key.toLowerCase();
+    if (keys.hasOwnProperty(key)) {
+        keys[key] = false;
+    }
+    if (event.key === ' ') {
+        keys[' '] = false;
+    }
+}
+
+function initializePlayerInput() {
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+}
+
+
+// --- 3. Player Movement Logic ---
+function handlePlayerMovement(mapWidth, mapHeight) {
+    let moved = false;
+    let dx = 0;
+    let dy = 0;
+
+    // Check for combined keyboard inputs (WASD or Arrows)
+    if (keys.ArrowUp || keys.w) {
+        dy -= jason.currentSpeed;
+        jason.direction = 'up';
+        moved = true;
+    }
+    if (keys.ArrowDown || keys.s) {
+        dy += jason.currentSpeed;
+        jason.direction = 'down';
+        moved = true;
+    }
+    if (keys.ArrowLeft || keys.a) {
+        dx -= jason.currentSpeed;
+        jason.direction = 'left';
+        moved = true;
+    }
+    if (keys.ArrowRight || keys.d) {
+        dx += jason.currentSpeed;
+        jason.direction = 'right';
+        moved = true;
+    }
+
+    // Diagonal movement normalization 
+    if (dx !== 0 && dy !== 0) {
+        const diagonalFactor = 1 / Math.sqrt(2);
+        dx *= diagonalFactor;
+        dy *= diagonalFactor;
+    }
+
+    // Apply movement
+    jason.x += dx;
+    jason.y += dy;
+    jason.isMoving = moved;
+    
+    // Keep Jason within the map bounds
+    jason.x = Math.max(0, Math.min(mapWidth - jason.size, jason.x));
+    jason.y = Math.max(0, Math.min(mapHeight - jason.size, jason.y));
+
+
+    // --- Animation Update Logic ---
+    if (jason.isMoving) {
+        jason.frameTimer++;
+        if (jason.frameTimer >= jason.frameDelay) {
+            // Cycle between Frame 0 and Frame 1
+            jason.currentFrame = (jason.currentFrame + 1) % JASON_ANIMATIONS[jason.direction].length;
+            jason.frameTimer = 0;
+        }
+    } else {
+        // If not moving, show the standing frame (Frame 0)
+        jason.currentFrame = 0;
+        jason.frameTimer = 0;
+    }
+}
+
+// --- 4. Player Abilities and Attack Logic ---
+
+/**
+ * Handles activation of abilities via hotkeys or UI.
+ */
+function activateAbility(abilityName) {
+    // Handle standard abilities
+    if (abilityName !== 'attack') {
+        const ability = jason.abilities[abilityName];
+        // Rage is a special case: if it's already active, don't allow re-use.
+        if (!ability || ability.cooldownTimer > 0 || (abilityName === 'rage' && jason.isRageActive)) {
+            return;
+        }
+
+        // Set cooldown immediately (Rage uses its cooldown to stay disabled)
+        ability.cooldownTimer = ability.cooldown; 
+
+        switch (abilityName) {
+            case 'dash':
+                isDashing = true;
+                jason.currentSpeed = jason.baseSpeed * 2.5; // 2.5x speed boost
+                ability.durationTimer = ability.duration;
+                break;
+            case 'vision':
+                jason.isVisionActive = true;
+                ability.durationTimer = ability.duration;
+                break;
+            case 'teleport':
+                // Teleport: Warp at least 300 units away
+                const oldX = jason.x;
+                const oldY = jason.y;
+                let newX, newY;
+                
+                do {
+                    newX = Math.random() * (MAP_WIDTH - jason.size);
+                    newY = Math.random() * (MAP_HEIGHT - jason.size);
+                } while (Math.sqrt(Math.pow(newX - oldX, 2) + Math.pow(newY - oldY, 2)) < 300);
+
+                jason.x = newX;
+                jason.y = newY;
+                break;
+            case 'rage':
+                // Rage: Permanent stat increase
+                jason.isRageActive = true;
+                jason.baseSpeed *= 1.5; // 50% permanent speed boost
+                jason.currentSpeed = jason.baseSpeed; // Apply immediately
+                break;
+        }
+    } else {
+        // Handle Attack (Spacebar)
+        if (jason.attack.cooldownTimer === 0) {
+             jason.isAttacking = true;
+             jason.attack.cooldownTimer = jason.attack.cooldown;
+        }
+    }
+}
+
+/**
+ * Updates all ability and attack cooldowns and active durations every frame.
+ */
+function updateAbilitiesAndAttack() {
+    // 1. Check hotkeys (Q, V, E, R, Spacebar)
+    if (keys.q) activateAbility('dash');
+    if (keys.v) activateAbility('vision');
+    if (keys.e) activateAbility('teleport');
+    if (keys.r) activateAbility('rage');
+    if (keys[' ']) activateAbility('attack'); // Check attack hotkey
+
+    // 2. Update Attack Timer (NEW)
+    if (jason.attack.cooldownTimer > 0) {
+        jason.attack.cooldownTimer--;
+    }
+    
+    // Attack duration is very short (e.g., 5 frames)
+    if (jason.attack.cooldownTimer === jason.attack.cooldown - 5) {
+        jason.isAttacking = false;
+    }
+
+    // 3. Update Ability Timers
+    for (const abilityName in jason.abilities) {
+        const ability = jason.abilities[abilityName];
+        
+        // Cooldown Timer
+        if (ability.cooldownTimer > 0) {
+            ability.cooldownTimer--;
+        }
+        
+        // Duration Timer (Dash and Vision)
+        if (ability.durationTimer > 0) {
+            ability.durationTimer--;
+            
+            // Handle duration end
+            if (ability.durationTimer === 0) {
+                if (abilityName === 'dash') {
+                    isDashing = false;
+                    jason.currentSpeed = jason.baseSpeed; // Reset speed
+                }
+                if (abilityName === 'vision') {
+                    jason.isVisionActive = false;
+                }
+            }
+        }
+    }
+
+    // 4. Speed enforcement (Reset speed if all temporary boosts are off)
+    if (!isDashing) {
+        jason.currentSpeed = jason.baseSpeed;
+    }
+}
+
+
+// ---------------------------------
+// Game Manager Module (Central Core)
+// ---------------------------------
+
+// --- 1. Global Game State and Constants ---
+let canvas;
+let ctx;
+
+const MAP_WIDTH = 800;
+const MAP_HEIGHT = 800;
+
+let isGameRunning = false;
+let counselors = []; // Array to hold all AI counselors
+
+// Asset Storage
+let jasonSpriteImage;
+
+
+// --- 2. Asset Loading ---
+
+/**
+ * Loads all necessary game assets before starting.
+ */
+function loadAssets() {
+    return new Promise((resolve) => {
+        jasonSpriteImage = new Image();
+        // --- MANDATORY USER PATH INSTRUCTION APPLIED ---
+        jasonSpriteImage.src = 'images/sprites/jason/jason-base-spritesheet.png'; 
+        // ------------------------------------------------
+
+        jasonSpriteImage.onload = () => {
+            console.log("Jason spritesheet loaded successfully.");
+            resolve();
+        };
+        jasonSpriteImage.onerror = () => {
+            console.error(`Failed to load Jason spritesheet from: ${jasonSpriteImage.src}`);
+            resolve(); // Still resolve to allow game to start, just without Jason image
+        }
+    });
+}
+
+
+// --- 3. Menu and Screen Functions (Called by index.html buttons) ---
+
+/**
+ * Hides all screens and shows the one specified by ID.
+ */
+window.showScreen = function(id) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.style.display = 'none';
+    });
+    const screenToShow = document.getElementById(id);
+    if (screenToShow) {
+        screenToShow.style.display = 'flex';
+    }
+}
+
+/**
+ * Starts the game, initializes the canvas, and begins the game loop.
+ */
+window.startGame = async function(jasonId) {
+    // 1. Ensure assets are loaded before game start
+    await loadAssets();
+
+    // 2. Update Game State
+    jason.currentJasonId = jasonId;
+    isGameRunning = true;
+    
+    // 3. Initialize Canvas
+    canvas = document.getElementById('game-canvas');
+    ctx = canvas.getContext('2d');
+    canvas.width = MAP_WIDTH;
+    canvas.height = MAP_HEIGHT;
+    
+    // 4. Initialize Counselors
+    counselors = createCounselors(7, MAP_WIDTH, MAP_HEIGHT);
+
+    // 5. Show Game Screen
+    window.showScreen('game-screen');
+    
+    // 6. Start the Game Loop
+    gameLoop();
+}
+
+/**
+ * Global function to handle ability activation from UI buttons.
+ */
+window.handleAbility = activateAbility;
+
+// --- 4. Collision Utility (NEW) ---
+
+/**
+ * Checks for Axis-Aligned Bounding Box (AABB) collision between two objects.
+ * Assumes objects have x, y, and size properties.
+ */
+function checkCollision(r1, r2) {
+    return r1.x < r2.x + r2.size &&
+           r1.x + r1.size > r2.x &&
+           r1.y < r2.y + r2.size &&
+           r1.y + r1.size > r2.y;
+}
+
+// --- 5. Core Game Logic (Update) ---
+
+function update() {
+    if (!isGameRunning) return;
+
+    // 1. Handle Player Input and Movement
+    handlePlayerMovement(MAP_WIDTH, MAP_HEIGHT); 
+
+    // 2. Update Abilities and Attack Timers
+    updateAbilitiesAndAttack();
+
+    // 3. Handle Attack and Collision (NEW)
+    if (jason.isAttacking) {
+        // Define Jason's attack hitbox (slightly larger than Jason)
+        const ATTACK_SIZE_BUFFER = 20; 
+        const attackHitbox = {
+            x: jason.x - ATTACK_SIZE_BUFFER / 2,
+            y: jason.y - ATTACK_SIZE_BUFFER / 2,
+            size: jason.size + ATTACK_SIZE_BUFFER
+        };
+
+        counselors.forEach(counselor => {
+            if (counselor.isAlive && checkCollision(attackHitbox, counselor)) {
+                
+                // Counselor takes damage
+                counselor.health -= 50; 
+                
+                if (counselor.health <= 0) {
+                    counselor.isAlive = false;
+                    console.log("Counselor eliminated!");
+                } else {
+                    console.log("Counselor damaged! Health remaining: " + counselor.health);
+                }
+            }
+        });
+    }
+
+
+    // 4. Handle AI movement
+    counselors.forEach(counselor => {
+        updateCounselor(counselor, MAP_WIDTH, MAP_HEIGHT);
+    });
+
+    // 5. Update UI
+    updateUI();
+}
+
+// --- 6. Drawing and Rendering ---
+
+function drawJason() {
+    // Only draw the spritesheet if it loaded correctly
+    if (jasonSpriteImage && jasonSpriteImage.complete && jasonSpriteImage.naturalWidth > 0) {
+        const animation = JASON_ANIMATIONS[jason.direction];
+        if (!animation) return; 
+
+        const frameData = animation[jason.currentFrame];
+        const sx = frameData.sx; 
+        const sy = frameData.sy; 
+        const sw = jason.frameWidth; 
+        const sh = jason.frameHeight; 
+        
+        const dx = jason.x; 
+        const dy = jason.y; 
+        const dw = jason.size; 
+        const dh = jason.size * (jason.frameHeight / jason.frameWidth);
+
+        // Draw the image frame
+        ctx.drawImage(
+            jasonSpriteImage,
+            sx, sy, sw, sh,
+            dx, dy, dw, dh
+        );
+        
+        // Optional: Draw a red box around Jason when attacking
+        if (jason.isAttacking) {
+             const ATTACK_SIZE_BUFFER = 20; 
+             ctx.strokeStyle = '#FF0000';
+             ctx.lineWidth = 4;
+             ctx.strokeRect(jason.x - ATTACK_SIZE_BUFFER/2, jason.y - ATTACK_SIZE_BUFFER/2, jason.size + ATTACK_SIZE_BUFFER, jason.size + ATTACK_SIZE_BUFFER);
+        }
+
+    } else {
+        // Fallback: Draw a simple red box if image failed to load
+        ctx.fillStyle = 'red';
+        ctx.fillRect(jason.x, jason.y, jason.size, jason.size);
+    }
+}
+
+function drawCounselors() {
+    counselors.forEach(counselor => {
+        if (counselor.isAlive) {
+            
+            // Vision Mode Highlight 
+            if (jason.isVisionActive) {
+                 ctx.strokeStyle = '#FF0000'; // Red outline
+                 ctx.lineWidth = 3;
+                 // Draw the outline slightly bigger than the counselor
+                 ctx.strokeRect(counselor.x - 1, counselor.y - 1, COUNSELOR_SIZE + 2, COUNSELOR_SIZE + 2);
+            }
+
+            // Simple drawn counselor shape (Alive)
+            ctx.fillStyle = '#4B8BFF'; // Blue shirt color
+            ctx.fillRect(counselor.x, counselor.y, COUNSELOR_SIZE, COUNSELOR_SIZE);
+
+            ctx.fillStyle = '#FFC300'; // Blonde/bright hair
+            const headSize = COUNSELOR_SIZE / 2;
+            ctx.fillRect(counselor.x + COUNSELOR_SIZE / 4, counselor.y, headSize, headSize);
+
+        } else {
+            // Simple drawn counselor shape (DEAD)
+            ctx.fillStyle = 'var(--color-dead)'; // Grey color
+            ctx.fillRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4); // Draw a flat, small 'body'
+            ctx.strokeStyle = 'var(--color-blood)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4);
+        }
+    });
+}
+
+function drawMap() {
+    // Clear the canvas
+    ctx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    
+    // Draw the basic map background (Forest)
+    ctx.fillStyle = '#2c4a2a'; // Moss/Forest background
+    ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+    // Draw Jason's Cabin (Starting area)
+    const cabinW = 150;
+    const cabinH = 150;
+    const cabinX = (MAP_WIDTH / 2) - (cabinW / 2);
+    const cabinY = (MAP_HEIGHT / 2) - (cabinH / 2);
+    ctx.fillStyle = '#4a342a'; // Wood/Cabin color
+    ctx.fillRect(cabinX, cabinY, cabinW, cabinH);
+    
+    // Cabin Text Overlay
+    ctx.font = '16px "Press Start 2P"';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText("JASON'S CABIN", MAP_WIDTH / 2, MAP_HEIGHT / 2 + 5);
+
+    // Vision Filter Overlay 
+    if (jason.isVisionActive) {
+        // Apply a dark, bloody red filter over the entire map
+        ctx.fillStyle = 'rgba(136, 28, 28, 0.4)'; // var(--color-blood) with transparency
+        ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    }
+}
+
+function draw() {
+    drawMap();
+    drawCounselors(); 
+    drawJason(); 
+}
+
+
+// --- 7. UI Update Logic ---
+
+function updateUI() {
+    // Update Health Bar (Static for now)
+    const healthPercent = (jason.health / jason.maxHealth) * 100;
+    const healthFill = document.getElementById('health-bar-fill');
+    if (healthFill) {
+        healthFill.style.width = `${healthPercent}%`;
+    }
+
+    // Update Counselor Count
+    const aliveCount = counselors.filter(c => c.isAlive).length;
+    const counselorCountSpan = document.getElementById('counselor-count');
+    if (counselorCountSpan) {
+        counselorCountSpan.textContent = aliveCount; 
+    }
+    
+    // Update Attack Button (NEW)
+    const updateAttackButton = () => {
+        const button = document.getElementById('ability-attack');
+        if (!button) return;
+
+        let displayState = `Attack (Space)`;
+        button.classList.remove('cooldown');
+
+        if (jason.attack.cooldownTimer > 0) {
+            const time = Math.ceil(jason.attack.cooldownTimer / 60); // Frames to seconds
+            displayState = `Attack (${time}s)`;
+            button.classList.add('cooldown');
+        } 
+        button.textContent = displayState;
+    };
+    updateAttackButton();
+
+    // Update Ability Buttons and Cooldowns
+    const abilities = jason.abilities;
+    const updateAbilityButton = (id, abilityName, hotkey) => {
+        const button = document.getElementById(id);
+        const ability = abilities[abilityName];
+        if (!button || !ability) return;
+
+        let displayState = `${abilityName.toUpperCase()} (${hotkey})`;
+        button.classList.remove('cooldown');
+
+        if (ability.cooldownTimer > 0) {
+            const time = Math.ceil(ability.cooldownTimer / 60); // Convert frames to seconds (approx 60fps)
+            displayState = `${abilityName.toUpperCase()} (${time}s)`;
+            button.classList.add('cooldown');
+        } 
+        
+        if (abilityName === 'rage' && jason.isRageActive) {
+             displayState = `RAGE (PERM)`;
+             button.classList.add('cooldown'); 
+        }
+
+        button.textContent = displayState;
+    };
+    
+    updateAbilityButton('ability-dash', 'dash', 'Q');
+    updateAbilityButton('ability-vision', 'vision', 'V');
+    updateAbilityButton('ability-teleport', 'teleport', 'E');
+    updateAbilityButton('ability-rage', 'rage', 'R');
+
+    // Update Ability Status
+    let statusText = 'Normal';
+    if (jason.isVisionActive) {
+        statusText = 'Vision Mode Active';
+    } else if (isDashing) {
+        statusText = 'Dashing';
+    } else if (jason.isRageActive) {
+        statusText = 'Raged';
+    }
+    document.getElementById('ability-status').textContent = statusText;
+}
+
+
+// --- 8. Main Game Loop ---
+
+function gameLoop() {
+    if (!isGameRunning) return; 
+
+    update();
+    draw();
+
+    requestAnimationFrame(gameLoop); 
+}
+
+
+// --- 9. Initialization (Start at Menu) ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Initialize input listeners from the player module
+    initializePlayerInput();
+    
+    // 2. Ensure the main menu is visible when the page loads
+    window.showScreen('main-menu');
+    updateUI(); 
+});
+</script>
 </html>

@@ -1,0 +1,8 @@
+-Integrated everything into the html file cause the ai for some reason cannot do seperate files
+-Made a placeholder block for the player just to test functionality
+-Added basic counselor ai
+
+
+-We need to add a bigger map
+-We need collisions
+-We need smarter ai
