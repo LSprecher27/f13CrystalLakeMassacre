@@ -6,8 +6,8 @@
     <title>Crystal Lake Nightmare (8-Bit)</title>
     <style>
 /* ---------------------------------
-   Step 11: Friday 13th 8-Bit CSS Styling
-   --------------------------------- */
+    Step 14: Friday 13th 8-Bit CSS Styling
+    --------------------------------- */
 
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -32,7 +32,7 @@ body {
     padding: 0;
     display: flex;
     justify-content: center;
-    align-items: center; /* <-- FIX 1: Was 'align' */
+    align-items: center; 
     min-height: 100vh;
     overflow: hidden;
     text-align: center;
@@ -51,7 +51,7 @@ body {
     border-radius: 12px;
     display: flex;
     flex-direction: column;
-    align-items: center; /* <-- FIX 2: Was 'align' */
+    align-items: center; 
     box-sizing: border-box;
 }
 
@@ -73,7 +73,7 @@ h2 {
     width: 100%;
     display: none; /* Controlled by JavaScript */
     flex-direction: column;
-    align-items: center; /* <-- FIX 3: Was 'align' */
+    align-items: center; 
 }
 
 #main-menu, #jason-selector-screen {
@@ -150,7 +150,7 @@ h2 {
     padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: center; /* <-- FIX 4: Was 'align' */
+    align-items: center; 
     box-sizing: border-box;
 }
 
@@ -332,15 +332,6 @@ h2 {
 
 /**
  * Checks for Axis-Aligned Bounding Box (AABB) collision between two rectangles.
- * @param {number} r1x - Rectangle 1's X position.
- * @param {number} r1y - Rectangle 1's Y position.
- * @param {number} r1w - Rectangle 1's Width.
- * @param {number} r1h - Rectangle 1's Height.
- * @param {number} r2x - Rectangle 2's X position.
- * @param {number} r2y - Rectangle 2's Y position.
- * @param {number} r2w - Rectangle 2's Width.
- * @param {number} r2h - Rectangle 2's Height.
- * @returns {boolean} True if they are colliding.
  */
 function checkAABB(r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
     return r1x < r2x + r2w &&
@@ -349,11 +340,22 @@ function checkAABB(r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
            r1y + r1h > r2y;
 }
 
+/**
+ * Calculates squared distance. Faster than regular distance (avoids sqrt).
+ */
+function distanceSq(x1, y1, x2, y2) {
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    return dx * dx + dy * dy;
+}
+
+
 // ---------------------------------
 // Counselor AI Module 
 // ---------------------------------
 
 const COUNSELOR_SIZE = 24; // Counselors are slightly smaller than Jason (64)
+const JASON_FEAR_RADIUS_SQ = 200 * 200; // Counselors panic if Jason is within 200 pixels
 
 // Defines the base properties for an AI Counselor
 const baseCounselor = {
@@ -365,7 +367,10 @@ const baseCounselor = {
     isAlive: true,
     targetX: 0,
     targetY: 0,
-    state: 'wandering', // States: 'wandering', 'escaping', 'repairing', 'dead'
+    // States: 'wandering', 'searching', 'collecting', 'repairing', 'escaping', 'fleeing', 'dead'
+    state: 'wandering', 
+    itemTarget: null, // The specific item object the counselor is moving toward
+    objectiveTarget: null, // The specific objective object (e.g., car)
     isLoud: false, 
     inventory: {
         battery: false,
@@ -378,11 +383,13 @@ const baseCounselor = {
 
 /**
  * Creates a counselor object with random properties and position.
- * @param {number} worldWidth - Width of the game WORLD.
- * @param {number} worldHeight - Height of the game WORLD.
  */
 function createCounselor(worldWidth, worldHeight, isTommy = false) {
-    const counselor = { ...baseCounselor };
+    // NEW: Use a deep copy for the inventory object
+    const counselor = { 
+        ...baseCounselor,
+        inventory: { ...baseCounselor.inventory } 
+    };
 
     // Spawn randomly outside the central cabin area (150x150 center)
     const centerX = worldWidth / 2;
@@ -416,44 +423,190 @@ function createCounselor(worldWidth, worldHeight, isTommy = false) {
 
 /**
  * Creates an array of counselors.
- * @param {number} worldWidth - Width of the game WORLD.
- * @param {number} worldHeight - Height of the game WORLD.
  */
 function createCounselors(count, worldWidth, worldHeight) {
     const counselors = [];
     for (let i = 0; i < count; i++) {
-        counselors.push(createCounselor(worldWidth, worldHeight));
+        // Assign a unique temporary ID to each counselor for logging/tracking
+        const newCounselor = createCounselor(worldWidth, worldHeight);
+        newCounselor.id = `counselor_${i}`;
+        counselors.push(newCounselor);
     }
     return counselors;
 }
 
 /**
- * Updates the state and position of a single counselor (simple wandering AI).
- * @param {number} worldWidth - Width of the game WORLD.
- * @param {number} worldHeight - Height of the game WORLD.
+ * Finds the nearest item that the counselor needs and is NOT currently targeted
+ * by another counselor who is searching or collecting. This forces counselors to spread out.
  */
-function updateCounselor(counselor, worldWidth, worldHeight) {
-    if (!counselor.isAlive || counselor.state !== 'wandering') return;
+function findAvailableItemNeeded(counselor, items, allCounselors) {
+    // 1. Get a list of item IDs already targeted by other searching/collecting counselors
+    const targetedItemIds = allCounselors
+        .filter(c => c !== counselor && (c.state === 'searching' || c.state === 'collecting'))
+        .map(c => c.itemTarget ? c.itemTarget.id : null)
+        .filter(id => id); // Filter out nulls
+
+    let nearestItem = null;
+    let minDistanceSq = Infinity;
+    const neededTypes = ['gas', 'battery', 'keys'];
+
+    for (const item of items) {
+        // Condition 1: Counselor needs this type of item AND it's not collected.
+        if (neededTypes.includes(item.type) && !item.isCollected && !counselor.inventory[item.type]) {
+            
+            // Condition 2: Check if this item instance is already targeted by someone else
+            if (!targetedItemIds.includes(item.id)) {
+                const distSq = distanceSq(item.x, item.y, counselor.x, counselor.y);
+
+                if (distSq < minDistanceSq) {
+                    minDistanceSq = distSq;
+                    nearestItem = item;
+                }
+            }
+        }
+    }
+    return nearestItem;
+}
+
+/**
+ * Finds the main escape objective (The Car).
+ */
+function findCarObjective(objectives) {
+    return objectives.find(obj => obj.type === 'car');
+}
+
+/**
+ * Updated updateCounselor function with "Fear" AI.
+ */
+function updateCounselor(counselor, worldWidth, worldHeight, items, objectives, allCounselors, jason) {
+    if (!counselor.isAlive) {
+        counselor.state = 'dead';
+        return;
+    }
     
+    // 1. Check for Fear
+    const distToJasonSq = distanceSq(counselor.x, counselor.y, jason.x, jason.y);
+    if (distToJasonSq < JASON_FEAR_RADIUS_SQ) {
+        counselor.state = 'fleeing';
+        // Flee directly away from Jason
+        const dx = counselor.x - jason.x;
+        const dy = counselor.y - jason.y;
+        const dist = Math.sqrt(distToJasonSq);
+        
+        counselor.targetX = counselor.x + (dx / dist) * 100; // Flee 100 units away
+        counselor.targetY = counselor.y + (dy / dist) * 100;
+        
+        // Reset any interaction
+        if (counselor.itemTarget) counselor.itemTarget.collectionTimer = 0;
+        if (counselor.objectiveTarget) counselor.objectiveTarget.repairTimer = 0;
+        
+        counselor.itemTarget = null;
+        counselor.objectiveTarget = null;
+        
+    } else if (counselor.state === 'fleeing') {
+        // If "fleeing" and Jason is no longer close, go back to wandering
+        counselor.state = 'wandering';
+    }
+
+    // 2. Determine next action (if not fleeing)
+    if (counselor.state !== 'fleeing') {
+        const carObjective = findCarObjective(objectives);
+        const hasItem = counselor.inventory.gas || counselor.inventory.battery || counselor.inventory.keys;
+        
+        // --- Prioritize Car/Repair if holding an item ---
+        if (hasItem && carObjective) {
+            counselor.state = 'repairing_target';
+            counselor.targetX = carObjective.x + carObjective.width / 2;
+            counselor.targetY = carObjective.y + carObjective.height / 2;
+            counselor.objectiveTarget = carObjective;
+            counselor.itemTarget = null;
+        } else {
+            // --- Look for Item or Escape ---
+            if (counselor.itemTarget && counselor.itemTarget.isCollected) {
+                counselor.itemTarget = null; // Item was snagged
+            }
+            
+            let item = counselor.itemTarget;
+            if (!item && (counselor.state === 'wandering' || counselor.state === 'searching')) {
+                item = findAvailableItemNeeded(counselor, items, allCounselors);
+            }
+            
+            if (item) {
+                // LOCK ONTO THE NEW ITEM
+                counselor.state = 'searching';
+                counselor.itemTarget = item;
+                counselor.targetX = item.x + item.size / 2;
+                counselor.targetY = item.y + item.size / 2;
+                counselor.objectiveTarget = null;
+            } else {
+                // Nothing to do: wander or escape (if car is repaired)
+                counselor.itemTarget = null;
+                counselor.objectiveTarget = null;
+                
+                if (carObjective && carObjective.repaired.length === carObjective.needs.length) {
+                    counselor.state = 'escaping';
+                    if (Math.random() < 0.5) { // Target X edge
+                        counselor.targetX = Math.random() < 0.5 ? 0 : worldWidth;
+                        counselor.targetY = counselor.y;
+                    } else { // Target Y edge
+                        counselor.targetX = counselor.x;
+                        counselor.targetY = Math.random() < 0.5 ? 0 : worldHeight;
+                    }
+                } else {
+                    counselor.state = 'wandering';
+                }
+            }
+        }
+    }
+    
+    // 3. Movement Logic (applies to all states)
     const dx = counselor.targetX - counselor.x;
     const dy = counselor.targetY - counselor.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    // Check if counselor has reached target or needs a new one (randomly)
-    if (distance < counselor.speed || Math.random() < 0.01) {
-        // Set a new random target point
-        counselor.targetX = Math.random() * (worldWidth - counselor.size);
-        counselor.targetY = Math.random() * (worldHeight - counselor.size);
+
+    // Check if counselor has reached their target (or is very close)
+    if (distance < counselor.speed * 2) { // Use a small buffer
+        if (counselor.state === 'wandering' || counselor.state === 'fleeing') {
+            // If wandering/fleeing and arrived, find a new random target
+            counselor.targetX = Math.random() * (worldWidth - counselor.size);
+            counselor.targetY = Math.random() * (worldHeight - counselor.size);
+            if(counselor.state === 'fleeing') counselor.state = 'wandering'; // Stop fleeing
+        }
+        // If 'searching' or 'repairing_target', the state will be updated
+        // by the collision checks in section 4. We stop moving.
+        
     } else {
         // Move towards the target
-        counselor.x += (dx / distance) * counselor.speed;
-        counselor.y += (dy / distance) * counselor.speed;
+        // NEW: Fleeing counselors move faster
+        const moveSpeed = counselor.state === 'fleeing' ? counselor.speed * 1.5 : counselor.speed;
+        counselor.x += (dx / distance) * moveSpeed;
+        counselor.y += (dy / distance) * moveSpeed;
     }
-    
+
     // Keep counselor within map bounds
     counselor.x = Math.max(0, Math.min(worldWidth - counselor.size, counselor.x));
     counselor.y = Math.max(0, Math.min(worldHeight - counselor.size, counselor.y));
+
+    // 4. Check for successful arrival (only check if not fleeing)
+    if (counselor.state !== 'fleeing') {
+        // Check if a 'searching' counselor reached their item
+        if (counselor.itemTarget && counselor.state === 'searching') {
+            const item = counselor.itemTarget;
+            if (!item.isCollected && checkAABB(counselor.x, counselor.y, counselor.size, counselor.size, item.x, item.y, item.size, item.size)) {
+                counselor.state = 'collecting'; // Counselor has reached the item
+            }
+        }
+        
+        // Check if a 'repairing_target' counselor reached the car
+        if (counselor.objectiveTarget && counselor.state === 'repairing_target') {
+            const obj = counselor.objectiveTarget;
+            if (checkAABB(counselor.x, counselor.y, counselor.size, counselor.size, obj.x, obj.y, obj.width, obj.height)) {
+                 counselor.state = 'repairing'; // Counselor has reached the objective
+            }
+        }
+    }
 }
+
 
 
 // ---------------------------------
@@ -464,13 +617,12 @@ function updateCounselor(counselor, worldWidth, worldHeight) {
 const WORLD_WIDTH_P = 2400; // World is 3x3 screens
 const WORLD_HEIGHT_P = 2400;
 
-// Global variable to track if dash is currently active (used for speed reset)
 let isDashing = false;
 
-// Defines the main player character (Jason)
-const jason = {
+// Define the initial state as a constant
+const jasonInitialState = {
     x: WORLD_WIDTH_P / 2, // Start in the center of the WORLD (horizontally)
-    y: (WORLD_HEIGHT_P / 2) + 85, // <-- FIX: Spawn just BELOW the cabin (not in it)
+    y: (WORLD_HEIGHT_P / 2) + 85, // Spawn just BELOW the cabin (not in it)
     width: 64, // Use width/height for collision
     height: 64, // Spritesheet aspect ratio is 1:2, but hitbox is 1:1
     
@@ -497,6 +649,7 @@ const jason = {
     // Ability state
     isVisionActive: false,
     isRageActive: false,
+    // NEW: Use deep copy for nested ability objects on reset
     abilities: {
         dash: { cooldown: 180, cooldownTimer: 0, duration: 60, durationTimer: 0 }, // 3s CD, 1s duration
         vision: { cooldown: 480, cooldownTimer: 0, duration: 300, durationTimer: 0 }, // 8s CD, 5s duration
@@ -504,6 +657,9 @@ const jason = {
         rage: { cooldown: 1800, cooldownTimer: 0, duration: 0, durationTimer: 0 } // 30s CD (only used once)
     }
 };
+
+// jason is now a 'let' variable, initialized from the constant state
+let jason = JSON.parse(JSON.stringify(jasonInitialState)); // Deep copy
 
 // Tracks key presses for smooth movement
 const keys = {
@@ -578,12 +734,9 @@ function initializePlayerInput() {
 }
 
 
-// --- 3. Player Movement Logic (NEW: With Collision) ---
+// --- 3. Player Movement Logic (With Collision) ---
 /**
  * Handles all player movement based on keyboard input, and updates animation state.
- * @param {number} worldWidth - Width of the game WORLD.
- * @param {number} worldHeight - Height of the game WORLD.
- * @param {Array<object>} obstacles - List of obstacle objects for collision.
  */
 function handlePlayerMovement(worldWidth, worldHeight, obstacles) {
     let moved = false;
@@ -621,7 +774,7 @@ function handlePlayerMovement(worldWidth, worldHeight, obstacles) {
     
     jason.isMoving = moved;
     
-    // --- NEW: Collision-aware movement ---
+    // --- Collision-aware movement ---
     
     // Check X-axis collision
     let targetX = jason.x + dx;
@@ -687,8 +840,6 @@ function checkTeleportCollision(x, y, obstacles) {
 
 /**
  * Handles activation of abilities via hotkeys or UI.
- * @param {string} abilityName - The name of the ability to activate.
- * @param {Array<object>} obstacles - List of obstacles (for teleport).
  */
 function activateAbility(abilityName, obstacles = []) {
     // Handle standard abilities
@@ -720,7 +871,7 @@ function activateAbility(abilityName, obstacles = []) {
                     newY = Math.random() * (WORLD_HEIGHT_P - jason.height);
                 } while (
                     // Check 1: Not too close to old spot
-                    Math.sqrt(Math.pow(newX - oldX, 2) + Math.pow(newY - oldY, 2)) < 300 ||
+                    distanceSq(newX, newY, oldX, oldY) < 300*300 ||
                     // Check 2: Not inside an obstacle
                     checkTeleportCollision(newX, newY, obstacles) 
                 );
@@ -745,7 +896,6 @@ function activateAbility(abilityName, obstacles = []) {
 
 /**
  * Updates all ability and attack cooldowns and active durations every frame.
- * @param {Array<object>} obstacles - List of obstacles (for teleport).
  */
 function updateAbilitiesAndAttack(obstacles) {
     // 1. Check hotkeys (Q, V, E, R, Spacebar)
@@ -802,6 +952,7 @@ function updateAbilitiesAndAttack(obstacles) {
 // --- 1. Global Game State and Constants ---
 let canvas;
 let ctx;
+let animationFrameId; // NEW: To stop the game loop
 
 const CANVAS_WIDTH = 800; // The size of the window
 const CANVAS_HEIGHT = 800;
@@ -814,7 +965,6 @@ let counselors = []; // Array to hold all AI counselors
 // Asset Storage
 let jasonSpriteImage;
 
-// NEW: Camera and Obstacles
 const camera = {
     x: 0,
     y: 0,
@@ -822,69 +972,92 @@ const camera = {
     height: CANVAS_HEIGHT
 };
 
-const obstacles = [
-    { 
-        x: (WORLD_WIDTH / 2) - 75, // Centered cabin
-        y: (WORLD_HEIGHT / 2) - 75,
-        width: 150, 
-        height: 150, 
-        name: "Jason's Cabin",
-        color: '#4a342a'
-    }
-    // We can add more obstacles here (trees, rocks, other cabins)
-];
+// Obstacles is now a 'let' variable so it can be reset
+let obstacles = [];
 let items = []; // Gas, Batteries, Keys; basically all stuff needed for counselors to escape
 let objectives = []; // Car, Phonebox; stuff needed to complete that allows the counselors to win
+let noisePings = []; // NEW: Array for visual noise alerts
+let gameTime = 0; // Tracks frames for repair/collection duration
 
 
 // --- 2. Asset Loading ---
 function loadAssets() {
     return new Promise((resolve) => {
         jasonSpriteImage = new Image();
-        // --- MANDATORY USER PATH INSTRUCTION APPLIED ---
-        jasonSpriteImage.src = "images/sprites/jason-base-spritesheet.png";        // ------------------------------------------------
+        jasonSpriteImage.src = "images/sprites/jason/baseJason/jason-base-spritesheet.png"; 
 
         jasonSpriteImage.onload = () => {
             console.log("Jason spritesheet loaded successfully.");
             resolve();
         };
         jasonSpriteImage.onerror = () => {
-            console.error(`Failed to load Jason spritesheet from: ${jasonSpriteImage.src}`);
-            resolve(); 
+            console.error(`Failed to load Jason spritesheet from: ${jasonSpriteImage.src}. Using placeholder. If you have a local file, ensure the path is correct.`);
+            resolve(); // Still resolve so the game can start without image
         }
     });
 }
+// Helper function to get a random spawn point away from obstacles
 function getSafeSpawn(worldWidth, worldHeight, obstacles, minDistance = 100) {
     let x, y;
     let isSafe = false;
-    while (!isSafe) {
-        x = Math.random() * (worldWidth - 30); //Just a rough estimate of item size, might need to change it
-        y = Math.random() * (worldHeight - 30);
-
-        isSafe = true; // Assume safe
+    let attempts = 0; // Initialize attempt counter
     
-        // Check against obstacles
+    while (!isSafe && attempts < 100) { 
+        x = Math.random() * (worldWidth - 30); // 30 is approx item size
+        y = Math.random() * (worldHeight - 30);
+        
+        isSafe = true; // Assume safe
+        
         for (const obstacle of obstacles) {
-            // Check of spawn is too close to obstacle or inside
-            if (checkAABB(x, y, 30, 30, obstacle.x, obstacle.y, obstacle.width, obstacle.height)) {
-                isSafe = false;
+            if (checkAABB(x, y, 30, 30, obstacle.x - minDistance, obstacle.y - minDistance, obstacle.width + minDistance*2, obstacle.height + minDistance*2)) {
+                isSafe = false; // Too close, reroll
                 break;
             }
         }
+        attempts++; // Increment attempt counter
     }
+    if (attempts >= 100) console.warn("Could not find a safe spawn within 100 attempts. Spawning anyway."); 
     return { x, y };
 }
+
 function initializeWorldObjects() {
-    // 1. Make the Car Repair Items
-    const gasSpawm = getSafeSpawn(WORLD_WIDTH, WORLD_HEIGHT, obstacles);
+    // 1. Create Repair Items
+    const gasSpawn = getSafeSpawn(WORLD_WIDTH, WORLD_HEIGHT, obstacles);
     items.push({
-        type: 'gas', x: gasSpawn.x, y:gasSpawn.y, size: 30, color: '#E8E40C', name: 'Gas', isCollected: false
+        id: 'item_gas', type: 'gas', x: gasSpawn.x, y: gasSpawn.y, size: 30, color: '#E8E40C', name: 'Gas', isCollected: false,
+        collectionTime: 180, collectionTimer: 0 // 3 seconds collection
     });
+
     const batterySpawn = getSafeSpawn(WORLD_WIDTH, WORLD_HEIGHT, obstacles);
     items.push({
-        type: 'battery', x: batterySpawn.x, y:batterySpawn.y, size: 30, color: '#0CEC0C', name: 'Battery', isCollected: false
+        id: 'item_battery', type: 'battery', x: batterySpawn.x, y: batterySpawn.y, size: 30, color: '#0CEC0C', name: 'Battery', isCollected: false,
+        collectionTime: 180, collectionTimer: 0
     });
+
+    const keysSpawn = getSafeSpawn(WORLD_WIDTH, WORLD_HEIGHT, obstacles);
+    items.push({
+        id: 'item_keys', type: 'keys', x: keysSpawn.x, y: keysSpawn.y, size: 20, color: '#E0E0E0', name: 'Keys', isCollected: false,
+        collectionTime: 120, collectionTimer: 0 // 2 seconds collection
+    });
+
+    // 2. Create Objectives (Fixed locations)
+    const car = {
+        type: 'car', x: 200, y: 200, width: 60, height: 110, color: '#606060', name: 'Car',
+        needs: ['gas', 'battery', 'keys'], repaired: [], repairTime: 300 // 5 seconds repair
+    };
+    objectives.push(car);
     
+    const phoneBox = {
+        type: 'phone', x: 2100, y: 2100, width: 40, height: 40, color: '#A36E42', name: 'Phone',
+        needs: ['radio'], repaired: [], repairTime: 300
+    };
+    objectives.push(phoneBox);
+    
+    // Add the car and phone box to obstacles so you can't walk through them
+    obstacles.push(car);
+    obstacles.push(phoneBox);
+    
+    console.log(`Initialized ${items.length} items and ${objectives.length} objectives.`);
 }
 
 // --- 3. Menu and Screen Functions (Called by index.html buttons) ---
@@ -898,31 +1071,57 @@ window.showScreen = function(id) {
     }
 }
 
-window.startGame = async function(jasonId) {
-    await loadAssets();
+// NEW: startGame is now the main reset and initialization function
+window.startGame = function(jasonId) {
+    console.log("Starting new game...");
+    
+    // Stop any existing game loop
+    if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+    }
+    
+    // --- RESET GAME STATE ---
+    jason = JSON.parse(JSON.stringify(jasonInitialState)); // Deep copy
+    counselors = [];
+    items = [];
+    objectives = [];
+    obstacles = [ // Reset obstacles to just the cabin
+        { 
+            x: (WORLD_WIDTH / 2) - 75,
+            y: (WORLD_HEIGHT / 2) - 75,
+            width: 150, 
+            height: 150, 
+            name: "Jason's Cabin",
+            color: '#4a342a'
+        }
+    ];
+    noisePings = [];
+    gameTime = 0;
+    isDashing = false;
+    // ------------------------
 
     jason.currentJasonId = jasonId;
     isGameRunning = true;
     
-    // Initialize Canvas to fixed screen size
+    // Initialize Canvas
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
     
-    // Initialize Counselors in the WORLD
+    // Initialize World
     counselors = createCounselors(7, WORLD_WIDTH, WORLD_HEIGHT);
+    initializeWorldObjects();
 
     window.showScreen('game-screen');
     
-    gameLoop();
+    gameLoop(); // Start the game loop
 }
 
 /**
  * Global function to handle ability activation from UI buttons.
  */
 window.handleAbility = (abilityName) => {
-    // Pass obstacles list when activating from UI
     activateAbility(abilityName, obstacles);
 };
 
@@ -944,6 +1143,8 @@ function updateCamera() {
 
 function update() {
     if (!isGameRunning) return;
+    
+    gameTime++; // Increment game frame counter
 
     // 1. Handle Player Input and Movement (with obstacle collision)
     handlePlayerMovement(WORLD_WIDTH, WORLD_HEIGHT, obstacles); 
@@ -967,9 +1168,34 @@ function update() {
                 
                 counselor.health -= 50; 
                 
+                // --- INTERRUPT ACTION ON HIT ---
+                if (counselor.state === 'collecting' || counselor.state === 'repairing') {
+                    counselor.state = 'fleeing'; // Panic!
+                    if (counselor.itemTarget) {
+                        counselor.itemTarget.collectionTimer = 0; // Reset progress
+                    }
+                    if (counselor.objectiveTarget) {
+                         counselor.objectiveTarget.repairTimer = 0; // Reset progress
+                    }
+                    console.log("Counselor action interrupted!");
+                }
+                
                 if (counselor.health <= 0) {
                     counselor.isAlive = false;
                     console.log("Counselor eliminated!");
+                    
+                    // --- ITEM DROP LOGIC ---
+                    const itemHeld = Object.keys(counselor.inventory).find(key => counselor.inventory[key] === true && key !== 'machete');
+                    if (itemHeld) {
+                        const item = items.find(i => i.type === itemHeld);
+                        if (item) {
+                            item.isCollected = false; // Make it available again
+                            item.x = counselor.x; // Drop it at counselor's location
+                            item.y = counselor.y;
+                            counselor.inventory[itemHeld] = false;
+                            console.log(`Counselor dropped ${item.name}!`);
+                        }
+                    }
                 } else {
                     console.log("Counselor damaged! Health remaining: " + counselor.health);
                 }
@@ -977,255 +1203,490 @@ function update() {
         });
     }
 
-    // 4. Handle AI movement
+    // 4. Handle Counselor AI movement and interactions
+    let aliveCounselors = 0;
     counselors.forEach(counselor => {
-        updateCounselor(counselor, WORLD_WIDTH, WORLD_HEIGHT);
+        if (counselor.isAlive) {
+            aliveCounselors++;
+            // Run AI logic to determine target and state
+            updateCounselor(counselor, WORLD_WIDTH, WORLD_HEIGHT, items, objectives, counselors, jason);
+            
+            // A. Handle Item Collection
+            if (counselor.state === 'collecting') {
+                const item = counselor.itemTarget;
+                if (item && !item.isCollected) {
+                    if(gameTime % 60 === 0) { // Add a ping every second
+                        addNoisePing(item.x, item.y);
+                    }
+                    
+                    item.collectionTimer = item.collectionTimer || item.collectionTime;
+                    item.collectionTimer--;
+                    
+                    if (item.collectionTimer <= 0) {
+                        item.isCollected = true;
+                        counselor.inventory[item.type] = true;
+                        counselor.state = 'repairing_target'; // Immediately pivot to the car
+                        console.log(`Counselor ${counselor.id} collected ${item.name}!`);
+                        item.collectionTimer = 0; // Reset for drawing
+                    }
+                }
+            }
+            
+            // B. Handle Objective Repair
+            if (counselor.state === 'repairing') {
+                const objective = counselor.objectiveTarget;
+                if (objective && objective.type === 'car') {
+                    
+                    const itemToUse = objective.needs.find(need => 
+                        counselor.inventory[need] && !objective.repaired.includes(need)
+                    );
+
+                    if (itemToUse) {
+                        if(gameTime % 60 === 0) {
+                            addNoisePing(objective.x, objective.y);
+                        }
+                        
+                        objective.repairTimer = objective.repairTimer || objective.repairTime;
+                        objective.repairTimer--;
+                        
+                        if (objective.repairTimer <= 0) {
+                            objective.repaired.push(itemToUse);
+                            counselor.inventory[itemToUse] = false; // Item used up
+                            objective.repairTimer = 0;
+                            counselor.state = 'wandering'; // Look for next thing
+                            console.log(`Car repaired with ${itemToUse}! Status: ${objective.repaired.length}/${objective.needs.length}`);
+                        }
+                    } else {
+                        objective.repairTimer = 0;
+                        counselor.state = 'wandering';
+                    }
+                }
+            }
+            
+            // C. Handle Counselor Escaping
+            if (counselor.state === 'escaping') {
+                if (counselor.x <= 0 || counselor.x >= WORLD_WIDTH - counselor.size ||
+                    counselor.y <= 0 || counselor.y >= WORLD_HEIGHT - counselor.size) {
+                    counselor.isAlive = false;
+                    console.log(`Counselor ${counselor.id} escaped!`);
+                }
+            }
+        }
     });
     
     // 5. Update Camera Position
     updateCamera();
-
-    // 6. Update UI
-    updateUI();
-}
-
-// --- 5. Drawing and Rendering (NEW: Camera-aware) ---
-
-function drawJason() {
-    // Draw relative to the world, camera translation handles screen position
     
-    // Only draw the spritesheet if it loaded correctly
-    if (jasonSpriteImage && jasonSpriteImage.complete && jasonSpriteImage.naturalWidth > 0) {
-        const animation = JASON_ANIMATIONS[jason.direction];
-        if (!animation) return; 
+    // 6. Update Noise Pings
+    updateNoisePings();
 
-        const frameData = animation[jason.currentFrame];
-        const sx = frameData.sx; 
-        const sy = frameData.sy; 
-        const sw = jason.frameWidth; 
-        const sh = jason.frameHeight; 
-        
-        const dx = jason.x; // World X
-        const dy = jason.y; // World Y
-        const dw = jason.width; // Draw width
-        const dh = jason.height * (jason.frameHeight / jason.frameWidth); // Maintain aspect ratio
+    // 7. Update UI
+    updateUI();
 
-        // Draw the image frame
-        ctx.drawImage(
-            jasonSpriteImage,
-            sx, sy, sw, sh,
-            dx, dy, dw, dh
-        );
-        
-        /*Optional: Draw a red box around Jason when attacking
-        if (jason.isAttacking) {
-             const ATTACK_SIZE_BUFFER = 20; 
-             ctx.strokeStyle = '#FF0000';
-             ctx.lineWidth = 4;
-             ctx.strokeRect(
-                 jason.x - ATTACK_SIZE_BUFFER/2, 
-                 jason.y - ATTACK_SIZE_BUFFER/2, 
-                 jason.width + ATTACK_SIZE_BUFFER, 
-                 jason.height + ATTACK_SIZE_BUFFER
-             );
-        }*/
-
-    } else {
-        // Fallback: Draw a simple red box if image failed to load
-        ctx.fillStyle = 'red';
-        ctx.fillRect(jason.x, jason.y, jason.width, jason.height);
+    // 8. --- NEW: WIN CONDITION CHECK ---
+    if (aliveCounselors === 0) {
+        isGameRunning = false; // Stop the game loop
+        console.log("All counselors are dead. Jason wins!");
+        // We use a simple alert for now, but this could be a custom modal
+        alert("You have eliminated all counselors. You Win!"); 
+        window.showScreen('main-menu'); // Return to home page
     }
 }
 
-function drawCounselors() {
-    // Draw relative to the world
-    counselors.forEach(counselor => {
-        if (counselor.isAlive) {
+// --- 5. Drawing and Rendering (Camera-aware) ---
+
+function drawBackground() {
+    ctx.fillStyle = '#2c4a2a'; // Forest/Moss color
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
+function drawObstacles() {
+    ctx.fillStyle = '#4a342a'; // Wood/Cabin color
+    ctx.font = '12px "Press Start 2P"'; 
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'var(--color-wood)';
+    
+    obstacles.forEach(obstacle => {
+        const drawX = obstacle.x - camera.x;
+        const drawY = obstacle.y - camera.y;
+
+        ctx.fillRect(drawX, drawY, obstacle.width, obstacle.height);
+        
+        ctx.fillStyle = 'var(--color-text)';
+        ctx.fillText(obstacle.name, drawX + obstacle.width / 2, drawY - 10);
+    });
+}
+
+// --- Noise Ping Functions ---
+/**
+ * Creates a new noise ping object at a world location.
+ */
+function addNoisePing(worldX, worldY) {
+    noisePings.push({
+        x: worldX,
+        y: worldY,
+        radius: 10,
+        maxRadius: 50,
+        life: 60, // Lasts 1 second
+    });
+}
+
+/**
+ * Updates all active noise pings, expanding them and fading them out.
+ */
+function updateNoisePings() {
+    noisePings = noisePings.filter(ping => {
+        ping.life--;
+        ping.radius += (ping.maxRadius - ping.radius) * 0.1; // Ease out
+        return ping.life > 0;
+    });
+}
+
+/**
+ * Draws all active noise pings on the canvas.
+ */
+function drawNoisePings() {
+    noisePings.forEach(ping => {
+        const drawX = ping.x - camera.x;
+        const drawY = ping.y - camera.y;
+        
+        ctx.strokeStyle = `rgba(255, 0, 0, ${ping.life / 60})`; // Fade out
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(drawX, drawY, ping.radius, 0, Math.PI * 2);
+        ctx.stroke();
+    });
+}
+// ---------------------------------
+
+
+/**
+ * Draws all collectible items.
+ */
+function drawItems() {
+    ctx.font = '10px "Press Start 2P"';
+    ctx.textAlign = 'center';
+
+    items.forEach(item => {
+        if (!item.isCollected) {
+            const drawX = item.x - camera.x;
+            const drawY = item.y - camera.y;
             
-            // Vision Mode Highlight 
-            if (jason.isVisionActive) {
-                 ctx.strokeStyle = '#FF0000'; // Red outline
-                 ctx.lineWidth = 3;
-                 ctx.strokeRect(counselor.x - 1, counselor.y - 1, COUNSELOR_SIZE + 2, COUNSELOR_SIZE + 2);
+            // Draw item rectangle
+            ctx.fillStyle = item.color;
+            ctx.fillRect(drawX, drawY, item.size, item.size);
+            
+            // Draw collection timer bar if active
+            if (item.collectionTimer > 0) {
+                 const percent = item.collectionTimer / item.collectionTime;
+                 const barWidth = item.size;
+                 const barHeight = 4;
+                 
+                 ctx.fillStyle = '#333';
+                 ctx.fillRect(drawX, drawY - 8, barWidth, barHeight);
+                 ctx.fillStyle = '#00FF00';
+                 ctx.fillRect(drawX, drawY - 8, barWidth * (1 - percent), barHeight); // Fill progresses from left to right
             }
-
-            // Simple drawn counselor shape (Alive)
-            ctx.fillStyle = '#4B8BFF'; // Blue shirt color
-            ctx.fillRect(counselor.x, counselor.y, COUNSELOR_SIZE, COUNSELOR_SIZE);
-
-            ctx.fillStyle = '#FFC300'; // Blonde/bright hair
-            const headSize = COUNSELOR_SIZE / 2;
-            ctx.fillRect(counselor.x + COUNSELOR_SIZE / 4, counselor.y, headSize, headSize);
-
-        } else {
-            // Simple drawn counselor shape (DEAD)
-            ctx.fillStyle = 'var(--color-dead)'; // Grey color
-            ctx.fillRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4);
-            ctx.strokeStyle = 'var(--color-blood)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4);
+            
+            // Draw name label
+            ctx.fillStyle = 'var(--color-text)';
+            ctx.fillText(item.name, drawX + item.size / 2, drawY - 18);
         }
     });
 }
 
-function drawMap() {
-    // Draw relative to the world
+/**
+ * Draws all objectives (Car, Phone Booth).
+ */
+function drawObjectives() {
+    ctx.font = '10px "Press Start 2P"';
+    ctx.textAlign = 'center';
     
-    // Draw the basic map background (Forest) - BIGGER
-    ctx.fillStyle = '#2c4a2a'; // Moss/Forest background
-    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-
-    // Draw all obstacles
-    obstacles.forEach(ob => {
-        ctx.fillStyle = ob.color; // Cabin color
-        ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
-
-        // Text Overlay
-        ctx.font = '16px "Press Start 2P"';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.textAlign = 'center';
-        ctx.fillText(ob.name, ob.x + ob.width / 2, ob.y + ob.height / 2 + 5);
+    objectives.forEach(obj => {
+        const drawX = obj.x - camera.x;
+        const drawY = obj.y - camera.y;
+        
+        // Draw objective rectangle
+        ctx.fillStyle = obj.color;
+        ctx.fillRect(drawX, drawY, obj.width, obj.height);
+        
+        // Draw status label
+        ctx.fillStyle = 'var(--color-text)';
+        const statusText = obj.type === 'car' ? `[${obj.repaired.length}/${obj.needs.length}]` : obj.name;
+        ctx.fillText(obj.name, drawX + obj.width / 2, drawY - 30);
+        ctx.fillText(statusText, drawX + obj.width / 2, drawY - 18);
+        
+        // Draw repair timer bar if active
+        if (obj.repairTimer > 0) {
+            const percent = obj.repairTimer / obj.repairTime;
+            const barWidth = obj.width;
+            const barHeight = 4;
+            
+            ctx.fillStyle = '#333';
+            ctx.fillRect(drawX, drawY - 8, barWidth, barHeight);
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(drawX, drawY - 8, barWidth * (1 - percent), barHeight);
+        }
+        
     });
-
-
-    // Vision Filter Overlay 
-    if (jason.isVisionActive) {
-        // Apply a dark, bloody red filter over the *entire world*
-        // This will be clipped by the camera translation
-        ctx.fillStyle = 'rgba(136, 28, 28, 0.4)'; 
-        ctx.fillRect(camera.x, camera.y, CANVAS_WIDTH, CANVAS_HEIGHT);
-    }
 }
 
 /**
- * Main rendering function, handles camera translation.
+ * Draws all alive counselors.
  */
+function drawCounselors() {
+    counselors.forEach(counselor => {
+        const drawX = counselor.x - camera.x;
+        const drawY = counselor.y - camera.y;
+        
+        if (counselor.isAlive) {
+            // Draw a simple green box for the counselor
+            ctx.fillStyle = counselor.state === 'fleeing' ? '#FFFF00' : '#00FF00'; // Yellow when fleeing
+            ctx.fillRect(drawX, drawY, counselor.size, counselor.size);
+
+            // Draw status (state)
+            ctx.font = '8px "Press Start 2P"';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            const statusMap = {
+                'wandering': '...',
+                'searching': 'ITEM!',
+                'collecting': 'GET!',
+                'repairing_target': 'CAR!',
+                'repairing': 'FIXING!',
+                'escaping': 'RUN!!!',
+                'fleeing': 'PANIC!', // NEW
+                'dead': 'X_X'
+            };
+            ctx.fillText(statusMap[counselor.state] || '...', drawX + counselor.size / 2, drawY - 20);
+            
+            // Draw item held (if any)
+            const itemHeld = Object.keys(counselor.inventory).find(key => counselor.inventory[key] === true);
+            if (itemHeld) {
+                ctx.fillStyle = '#FFD700'; // Gold star for holding item
+                ctx.fillText('★', drawX + counselor.size - 8, drawY + counselor.size + 10);
+            }
+            
+            // Draw health bar (above counselor)
+            const healthBarWidth = counselor.size;
+            const healthBarHeight = 4;
+            const healthPercentage = counselor.health / baseCounselor.health;
+            
+            ctx.fillStyle = '#333'; // Background
+            ctx.fillRect(drawX, drawY - 10, healthBarWidth, healthBarHeight);
+            
+            ctx.fillStyle = '#FF0000'; // Fill
+            ctx.fillRect(drawX, drawY - 10, healthBarWidth * healthPercentage, healthBarHeight);
+        } else {
+            // Draw dead counselor (gray box)
+            ctx.fillStyle = 'var(--color-dead)';
+            ctx.fillRect(drawX, drawY, counselor.size, counselor.size);
+            
+            // Draw a small "X" over the dead body
+            ctx.strokeStyle = 'var(--color-blood)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(drawX, drawY);
+            ctx.lineTo(drawX + counselor.size, drawY + counselor.size);
+            ctx.moveTo(drawX + counselor.size, drawY);
+            ctx.lineTo(drawX, drawY + counselor.size);
+            ctx.stroke();
+        }
+    });
+}
+
+function drawJason() {
+    // Calculate screen position for drawing
+    const drawX = jason.x - camera.x;
+    const drawY = jason.y - camera.y;
+    
+    // Fallback if sprite image failed to load
+    if (!jasonSpriteImage || !jasonSpriteImage.complete || jasonSpriteImage.naturalWidth === 0) {
+        ctx.fillStyle = 'var(--color-blood)';
+        ctx.fillRect(drawX, drawY, jason.width, jason.height);
+        ctx.fillStyle = 'var(--color-text)';
+        ctx.font = '10px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText('J', drawX + jason.width/2, drawY + jason.height/2 + 4);
+        return;
+    }
+
+    // Determine which frame to draw
+    const animation = JASON_ANIMATIONS[jason.direction];
+    if (!animation) return; 
+
+    const frameData = animation[jason.currentFrame];
+    const sx = frameData.sx; 
+    const sy = frameData.sy; 
+    const sw = FRAME_SIZE; 
+    const sh = ROW_SIZE; 
+    
+    // Destination position and size on canvas
+    const dx = drawX;
+    const dy = drawY - (jason.frameHeight - jason.height); // Offset Y to place feet at correct spot
+    const dw = FRAME_SIZE * 2; // Scale up the 32x64 sprite to 64x128 
+    const dh = ROW_SIZE * 2; 
+
+    // Draw the image/sprite
+    ctx.imageSmoothingEnabled = false; // Keep the sharp pixel look
+    ctx.drawImage(jasonSpriteImage, sx, sy, sw, sh, dx, dy, dw, dh);
+    
+    // Draw Attack Indicator (e.g., a short flash in front of Jason)
+    if (jason.isAttacking) {
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+        let attackRect = { x: 0, y: 0, w: 0, h: 0 };
+        
+        const attackLength = 10;
+        const attackWidth = 60; 
+        
+        switch(jason.direction) {
+            case 'up': 
+                attackRect = { x: drawX - 10, y: drawY - attackLength, w: attackWidth, h: attackLength };
+                break;
+            case 'down': 
+                attackRect = { x: drawX - 10, y: drawY + jason.height, w: attackWidth, h: attackLength };
+                break;
+            case 'left':
+                attackRect = { x: drawX - attackLength, y: drawY - 10, w: attackLength, h: attackWidth };
+                break;
+            case 'right':
+                attackRect = { x: drawX + jason.width, y: drawY - 10, w: attackLength, h: attackWidth };
+                break;
+        }
+        ctx.fillRect(attackRect.x, attackRect.y, attackRect.w, attackRect.h);
+    }
+}
+
+
 function draw() {
-    // Clear the *visible* canvas
+    if (!ctx) return;
+    
+    // 1. Clear the entire canvas
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-    // --- Save context and translate to camera position ---
-    ctx.save();
-    ctx.translate(-camera.x, -camera.y);
-
-    // --- Draw all game objects in WORLD coordinates ---
-    drawMap();
+    
+    // 2. Draw the background
+    drawBackground();
+    
+    // 3. Draw world elements
+    drawObjectives();
+    drawObstacles();
+    drawItems();
     drawCounselors(); 
-    drawJason(); 
+    drawNoisePings(); // NEW
+
+    // 4. Draw the player
+    drawJason();
     
-    // --- Restore context to draw UI elements (if any) ---
-    ctx.restore();
-    
-    // NOTE: Vision filter is now part of drawMap, but if we want it
-    // to overlay Jason, it should be here, *after* restore.
+    // 5. Draw overlay effects (like Jason's vision)
     if (jason.isVisionActive) {
-        // This draws the filter *over* the screen, including Jason
-        ctx.fillStyle = 'rgba(136, 28, 28, 0.4)'; 
+        // Simple red tint overlay
+        ctx.fillStyle = 'rgba(136, 28, 28, 0.2)'; 
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
 }
 
+// --- 6. UI Update ---
 
-// --- 6. UI Update Logic ---
-
+/**
+ * Updates the game UI panel elements based on current state.
+ */
 function updateUI() {
-    // Update Health Bar (Static for now)
-    const healthPercent = (jason.health / jason.maxHealth) * 100;
     const healthFill = document.getElementById('health-bar-fill');
     if (healthFill) {
-        healthFill.style.width = `${healthPercent}%`;
+        healthFill.style.width = `${(jason.health / jason.maxHealth) * 100}%`;
     }
-
-    // Update Counselor Count
+    
     const aliveCount = counselors.filter(c => c.isAlive).length;
-    const counselorCountSpan = document.getElementById('counselor-count');
-    if (counselorCountSpan) {
-        counselorCountSpan.textContent = aliveCount; 
+    const counselorCount = document.getElementById('counselor-count');
+    if (counselorCount) {
+        counselorCount.textContent = aliveCount;
     }
     
-    // Update Attack Button
-    const updateAttackButton = () => {
-        const button = document.getElementById('ability-attack');
-        if (!button) return;
+    const carObjective = findCarObjective(objectives);
+    const escapeStatus = document.getElementById('escape-status');
+    if (escapeStatus && carObjective) {
+        const repairedCount = carObjective.repaired.length;
+        const needsCount = carObjective.needs.length;
+        escapeStatus.textContent = repairedCount === needsCount ? 
+            "CAR READY! GO!" : 
+            `Car [${repairedCount}/${needsCount}]`;
+        escapeStatus.style.color = repairedCount === needsCount ? '#00FF00' : 'var(--color-blood)';
+    }
 
-        let displayState = `Attack (Space)`;
-        button.classList.remove('cooldown');
-
-        if (jason.attack.cooldownTimer > 0) {
-            const time = Math.ceil(jason.attack.cooldownTimer / 60); // Frames to seconds
-            displayState = `Attack (${time}s)`;
-            button.classList.add('cooldown');
-        } 
-        button.textContent = displayState;
-    };
-    updateAttackButton();
-
-    // Update Ability Buttons and Cooldowns
-    const abilities = jason.abilities;
-    const updateAbilityButton = (id, abilityName, hotkey) => {
-        const button = document.getElementById(id);
-        const ability = abilities[abilityName];
-        if (!button || !ability) return;
-
-        let displayState = `${abilityName.toUpperCase()} (${hotkey})`;
-        button.classList.remove('cooldown');
-
-        if (ability.cooldownTimer > 0) {
-            const time = Math.ceil(ability.cooldownTimer / 60); // Convert frames to seconds (approx 60fps)
-            displayState = `${abilityName.toUpperCase()} (${time}s)`;
-            button.classList.add('cooldown');
-        } 
-        
-        if (abilityName === 'rage' && jason.isRageActive) {
-             displayState = `RAGE (PERM)`;
-             button.classList.add('cooldown'); 
+    const statusElement = document.getElementById('ability-status');
+    if (statusElement) {
+        if (jason.isRageActive) {
+            statusElement.textContent = "RAGE!";
+            statusElement.style.color = '#FF0000';
+        } else if (jason.isVisionActive) {
+            statusElement.textContent = "VISION ACTIVE";
+            statusElement.style.color = '#FF9900';
+        } else if (isDashing) {
+            statusElement.textContent = "DASHING";
+            statusElement.style.color = '#00FF00';
+        } else {
+            statusElement.textContent = "NORMAL";
+            statusElement.style.color = 'var(--color-blood)';
         }
-
-        button.textContent = displayState;
-    };
-    
-    updateAbilityButton('ability-dash', 'dash', 'Q');
-    updateAbilityButton('ability-vision', 'vision', 'V');
-    // --- SYNTAX ERROR FIX ---
-    // I found a syntax error here from the last edit and fixed it.
-    updateAbilityButton('ability-teleport', 'teleport', 'E'); // Was missing quotes around 'E'
-    // ------------------------
-    updateAbilityButton('ability-rage', 'rage', 'R');
-
-    // Update Ability Status
-    let statusText = 'Normal';
-    if (jason.isVisionActive) {
-        statusText = 'Vision Mode Active';
-    } else if (isDashing) {
-        statusText = 'Dashing';
-    } else if (jason.isRageActive) {
-        statusText = 'Raged';
     }
-    document.getElementById('ability-status').textContent = statusText;
+
+    // Update ability button states (cooldown visuals)
+    for (const abilityName in jason.abilities) {
+        const button = document.getElementById(`ability-${abilityName}`);
+        if (button) {
+            const ability = jason.abilities[abilityName];
+            if (ability.cooldownTimer > 0) {
+                button.classList.add('cooldown');
+                // Display remaining cooldown frames (convert to seconds/10)
+                const secs = Math.ceil(ability.cooldownTimer / 60);
+                button.textContent = `${abilityName.toUpperCase()} (${secs}s)`;
+            } else {
+                button.classList.remove('cooldown');
+                // Reset text (based on hotkey)
+                let hotkey = '';
+                if (abilityName === 'dash') hotkey = '(Q)';
+                if (abilityName === 'vision') hotkey = '(V)';
+                if (abilityName === 'teleport') hotkey = '(E)';
+                if (abilityName === 'rage') hotkey = '(R)';
+                
+                // Handle RAGE permanent state
+                if (abilityName === 'rage' && jason.isRageActive) {
+                     button.textContent = "RAGE (ACTIVE)";
+                     button.classList.add('cooldown');
+                } else {
+                    button.textContent = `${abilityName.charAt(0).toUpperCase() + abilityName.slice(1)} ${hotkey}`;
+                }
+            }
+        }
+    }
 }
 
 
-// --- 7. Main Game Loop ---
-
+// --- 7. Game Loop ---
 function gameLoop() {
-    if (!isGameRunning) return; 
-
+    if (!isGameRunning) {
+        // If game is not running, stop the loop
+        cancelAnimationFrame(animationFrameId);
+        return;
+    }
+    
     update();
     draw();
-
-    requestAnimationFrame(gameLoop); 
+    animationFrameId = requestAnimationFrame(gameLoop); // Store the ID
 }
 
-
-// --- 8. Initialization (Start at Menu) ---
-
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initialize input listeners from the player module
+// --- NEW: Run setup on window load ---
+window.onload = async function () {
+    // Show the main menu by default
+    window.showScreen('main-menu');
+    
+    // Initialize input listeners once
     initializePlayerInput();
     
-    // 2. Ensure the main menu is visible when the page loads
-    window.showScreen('main-menu');
-    updateUI(); 
-});
+    // Load assets once, *before* the first game starts
+    await loadAssets(); 
+    
+    console.log("Game environment ready. Awaiting start...");
+};
 </script>
 </html>
