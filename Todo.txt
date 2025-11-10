@@ -3,6 +3,5 @@
 -Added basic counselor ai
 
 
--We need to add a bigger map
--We need collisions
+-We need to add a bigger map - Somewhat done, just need more POI's
 -We need smarter ai

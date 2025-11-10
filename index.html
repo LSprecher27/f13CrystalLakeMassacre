@@ -6,7 +6,7 @@
     <title>Crystal Lake Nightmare (8-Bit)</title>
     <style>
 /* ---------------------------------
-   Step 10: Friday 13th 8-Bit CSS Styling
+   Step 11: Friday 13th 8-Bit CSS Styling
    --------------------------------- */
 
 @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -32,7 +32,7 @@ body {
     padding: 0;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: center; /* <-- FIX 1: Was 'align' */
     min-height: 100vh;
     overflow: hidden;
     text-align: center;
@@ -51,7 +51,7 @@ body {
     border-radius: 12px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: center; /* <-- FIX 2: Was 'align' */
     box-sizing: border-box;
 }
 
@@ -73,7 +73,7 @@ h2 {
     width: 100%;
     display: none; /* Controlled by JavaScript */
     flex-direction: column;
-    align-items: center;
+    align-items: center; /* <-- FIX 3: Was 'align' */
 }
 
 #main-menu, #jason-selector-screen {
@@ -150,7 +150,7 @@ h2 {
     padding: 10px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: center; /* <-- FIX 4: Was 'align' */
     box-sizing: border-box;
 }
 
@@ -270,13 +270,13 @@ h2 {
             <div id="jason-list">
                 <!-- Jason 1 (Default) -->
                 <div id="jason-1" class="jason-card unlocked" data-jason-id="1">
-                    <p>Classic Jason</p>
+                    <p>Part 3 Jason</p>
                     <p style="font-size:0.5rem; color: #aaa;">(Unlocked)</p>
                 </div>
                 <!-- Placeholder for future Jasons -->
                 <div class="jason-card" data-jason-id="2">
-                    <p>Part 3 Jason</p>
-                    <p style="font-size:0.5rem; color: #aaa;">(LOCKED)</p>
+                    <p>Part 4 Jason</p>
+                    <p style="font-size:0.5rem; color: #aaa;">(LOCKED - COMING SOON)</p>
                 </div>
             </div>
             <button class="menu-button" onclick="window.startGame(1)">Begin Hunt</button>
@@ -327,10 +327,33 @@ h2 {
 </body>
 <script type="module">
 // ---------------------------------
+// Helper: Collision Utility
+// ---------------------------------
+
+/**
+ * Checks for Axis-Aligned Bounding Box (AABB) collision between two rectangles.
+ * @param {number} r1x - Rectangle 1's X position.
+ * @param {number} r1y - Rectangle 1's Y position.
+ * @param {number} r1w - Rectangle 1's Width.
+ * @param {number} r1h - Rectangle 1's Height.
+ * @param {number} r2x - Rectangle 2's X position.
+ * @param {number} r2y - Rectangle 2's Y position.
+ * @param {number} r2w - Rectangle 2's Width.
+ * @param {number} r2h - Rectangle 2's Height.
+ * @returns {boolean} True if they are colliding.
+ */
+function checkAABB(r1x, r1y, r1w, r1h, r2x, r2y, r2w, r2h) {
+    return r1x < r2x + r2w &&
+           r1x + r1w > r2x &&
+           r1y < r2y + r2h &&
+           r1y + r1h > r2y;
+}
+
+// ---------------------------------
 // Counselor AI Module 
 // ---------------------------------
 
-export const COUNSELOR_SIZE = 24; // Counselors are slightly smaller than Jason (64)
+const COUNSELOR_SIZE = 24; // Counselors are slightly smaller than Jason (64)
 
 // Defines the base properties for an AI Counselor
 const baseCounselor = {
@@ -355,20 +378,22 @@ const baseCounselor = {
 
 /**
  * Creates a counselor object with random properties and position.
+ * @param {number} worldWidth - Width of the game WORLD.
+ * @param {number} worldHeight - Height of the game WORLD.
  */
-function createCounselor(mapWidth, mapHeight, isTommy = false) {
+function createCounselor(worldWidth, worldHeight, isTommy = false) {
     const counselor = { ...baseCounselor };
 
     // Spawn randomly outside the central cabin area (150x150 center)
-    const centerX = mapWidth / 2;
-    const centerY = mapHeight / 2;
+    const centerX = worldWidth / 2;
+    const centerY = worldHeight / 2;
     const cabinRadius = 75; // Half of cabin size
 
     let x, y;
     do {
         // Random position within map bounds
-        x = Math.random() * (mapWidth - counselor.size);
-        y = Math.random() * (mapHeight - counselor.size);
+        x = Math.random() * (worldWidth - counselor.size);
+        y = Math.random() * (worldHeight - counselor.size);
     } while (
         x > centerX - cabinRadius && 
         x < centerX + cabinRadius && 
@@ -391,19 +416,23 @@ function createCounselor(mapWidth, mapHeight, isTommy = false) {
 
 /**
  * Creates an array of counselors.
+ * @param {number} worldWidth - Width of the game WORLD.
+ * @param {number} worldHeight - Height of the game WORLD.
  */
-function createCounselors(count, mapWidth, mapHeight) {
+function createCounselors(count, worldWidth, worldHeight) {
     const counselors = [];
     for (let i = 0; i < count; i++) {
-        counselors.push(createCounselor(mapWidth, mapHeight));
+        counselors.push(createCounselor(worldWidth, worldHeight));
     }
     return counselors;
 }
 
 /**
  * Updates the state and position of a single counselor (simple wandering AI).
+ * @param {number} worldWidth - Width of the game WORLD.
+ * @param {number} worldHeight - Height of the game WORLD.
  */
-function updateCounselor(counselor, mapWidth, mapHeight) {
+function updateCounselor(counselor, worldWidth, worldHeight) {
     if (!counselor.isAlive || counselor.state !== 'wandering') return;
     
     const dx = counselor.targetX - counselor.x;
@@ -413,8 +442,8 @@ function updateCounselor(counselor, mapWidth, mapHeight) {
     // Check if counselor has reached target or needs a new one (randomly)
     if (distance < counselor.speed || Math.random() < 0.01) {
         // Set a new random target point
-        counselor.targetX = Math.random() * (mapWidth - counselor.size);
-        counselor.targetY = Math.random() * (mapHeight - counselor.size);
+        counselor.targetX = Math.random() * (worldWidth - counselor.size);
+        counselor.targetY = Math.random() * (worldHeight - counselor.size);
     } else {
         // Move towards the target
         counselor.x += (dx / distance) * counselor.speed;
@@ -422,8 +451,8 @@ function updateCounselor(counselor, mapWidth, mapHeight) {
     }
     
     // Keep counselor within map bounds
-    counselor.x = Math.max(0, Math.min(mapWidth - counselor.size, counselor.x));
-    counselor.y = Math.max(0, Math.min(mapHeight - counselor.size, counselor.y));
+    counselor.x = Math.max(0, Math.min(worldWidth - counselor.size, counselor.x));
+    counselor.y = Math.max(0, Math.min(worldHeight - counselor.size, counselor.y));
 }
 
 
@@ -432,19 +461,22 @@ function updateCounselor(counselor, mapWidth, mapHeight) {
 // ---------------------------------
 
 // --- 1. Global Player State and Input ---
-const MAP_WIDTH_P = 800; 
-const MAP_HEIGHT_P = 800;
+const WORLD_WIDTH_P = 2400; // World is 3x3 screens
+const WORLD_HEIGHT_P = 2400;
 
 // Global variable to track if dash is currently active (used for speed reset)
 let isDashing = false;
 
 // Defines the main player character (Jason)
 const jason = {
-    x: MAP_WIDTH_P / 2, // Start in the center of the cabin map
-    y: MAP_HEIGHT_P / 2,
-    size: 64, 
-    frameWidth: 32, 
-    frameHeight: 64, 
+    x: WORLD_WIDTH_P / 2, // Start in the center of the WORLD (horizontally)
+    y: (WORLD_HEIGHT_P / 2) + 85, // <-- FIX: Spawn just BELOW the cabin (not in it)
+    width: 64, // Use width/height for collision
+    height: 64, // Spritesheet aspect ratio is 1:2, but hitbox is 1:1
+    
+    frameWidth: 32, // The width of a single sprite frame in the sheet
+    frameHeight: 64, // The height of a single sprite frame in the sheet
+    
     baseSpeed: 3,
     currentSpeed: 3,
     health: 100,
@@ -458,7 +490,7 @@ const jason = {
     frameTimer: 0,
     frameDelay: 8, 
     
-    // Attack state (NEW)
+    // Attack state
     isAttacking: false,
     attack: { cooldown: 60, cooldownTimer: 0 }, // 1 second cooldown
     
@@ -466,7 +498,6 @@ const jason = {
     isVisionActive: false,
     isRageActive: false,
     abilities: {
-        // Cooldown is in frames (60 frames = 1 second)
         dash: { cooldown: 180, cooldownTimer: 0, duration: 60, durationTimer: 0 }, // 3s CD, 1s duration
         vision: { cooldown: 480, cooldownTimer: 0, duration: 300, durationTimer: 0 }, // 8s CD, 5s duration
         teleport: { cooldown: 600, cooldownTimer: 0, duration: 0, durationTimer: 0 }, // 10s CD
@@ -484,7 +515,7 @@ const keys = {
     s: false,
     a: false,
     d: false,
-    ' ': false, // Spacebar for Attack (NEW)
+    ' ': false, // Spacebar for Attack
     q: false, // Dash
     v: false, // Vision
     e: false, // Teleport
@@ -495,6 +526,7 @@ const keys = {
 const FRAME_SIZE = 32;
 const ROW_SIZE = 64;
 
+// This object defines the (x, y) coordinates on the spritesheet for each frame
 const JASON_ANIMATIONS = {
     'down': [
         { sx: 0 * FRAME_SIZE, sy: 0 * ROW_SIZE },
@@ -525,7 +557,6 @@ function handleKeyDown(event) {
     if (keys.hasOwnProperty(key)) {
         keys[key] = true;
     }
-    // Handle Spacebar case specifically
     if (event.key === ' ') {
         keys[' '] = true;
     }
@@ -547,8 +578,14 @@ function initializePlayerInput() {
 }
 
 
-// --- 3. Player Movement Logic ---
-function handlePlayerMovement(mapWidth, mapHeight) {
+// --- 3. Player Movement Logic (NEW: With Collision) ---
+/**
+ * Handles all player movement based on keyboard input, and updates animation state.
+ * @param {number} worldWidth - Width of the game WORLD.
+ * @param {number} worldHeight - Height of the game WORLD.
+ * @param {Array<object>} obstacles - List of obstacle objects for collision.
+ */
+function handlePlayerMovement(worldWidth, worldHeight, obstacles) {
     let moved = false;
     let dx = 0;
     let dy = 0;
@@ -581,27 +618,54 @@ function handlePlayerMovement(mapWidth, mapHeight) {
         dx *= diagonalFactor;
         dy *= diagonalFactor;
     }
-
-    // Apply movement
-    jason.x += dx;
-    jason.y += dy;
+    
     jason.isMoving = moved;
     
-    // Keep Jason within the map bounds
-    jason.x = Math.max(0, Math.min(mapWidth - jason.size, jason.x));
-    jason.y = Math.max(0, Math.min(mapHeight - jason.size, jason.y));
+    // --- NEW: Collision-aware movement ---
+    
+    // Check X-axis collision
+    let targetX = jason.x + dx;
+    let targetY = jason.y; // Check X move at current Y
+    
+    let collidedX = false;
+    for (const obstacle of obstacles) {
+        if (checkAABB(targetX, targetY, jason.width, jason.height, obstacle.x, obstacle.y, obstacle.width, obstacle.height)) {
+            collidedX = true;
+            break;
+        }
+    }
+    if (!collidedX) {
+        jason.x = targetX; // Apply X movement
+    }
+
+    // Check Y-axis collision
+    targetX = jason.x; // Check Y move at *new* X
+    targetY = jason.y + dy;
+    
+    let collidedY = false;
+    for (const obstacle of obstacles) {
+        if (checkAABB(targetX, targetY, jason.width, jason.height, obstacle.x, obstacle.y, obstacle.width, obstacle.height)) {
+            collidedY = true;
+            break;
+        }
+    }
+    if (!collidedY) {
+        jason.y = targetY; // Apply Y movement
+    }
+    
+    // Keep Jason within the WORLD bounds
+    jason.x = Math.max(0, Math.min(worldWidth - jason.width, jason.x));
+    jason.y = Math.max(0, Math.min(worldHeight - jason.height, jason.y));
 
 
     // --- Animation Update Logic ---
     if (jason.isMoving) {
         jason.frameTimer++;
         if (jason.frameTimer >= jason.frameDelay) {
-            // Cycle between Frame 0 and Frame 1
             jason.currentFrame = (jason.currentFrame + 1) % JASON_ANIMATIONS[jason.direction].length;
             jason.frameTimer = 0;
         }
     } else {
-        // If not moving, show the standing frame (Frame 0)
         jason.currentFrame = 0;
         jason.frameTimer = 0;
     }
@@ -610,24 +674,36 @@ function handlePlayerMovement(mapWidth, mapHeight) {
 // --- 4. Player Abilities and Attack Logic ---
 
 /**
- * Handles activation of abilities via hotkeys or UI.
+ * Helper function for teleport to avoid spawning in obstacles
  */
-function activateAbility(abilityName) {
+function checkTeleportCollision(x, y, obstacles) {
+     for (const obstacle of obstacles) {
+        if (checkAABB(x, y, jason.width, jason.height, obstacle.x, obstacle.y, obstacle.width, obstacle.height)) {
+            return true; // Collided
+        }
+    }
+    return false; // Safe
+}
+
+/**
+ * Handles activation of abilities via hotkeys or UI.
+ * @param {string} abilityName - The name of the ability to activate.
+ * @param {Array<object>} obstacles - List of obstacles (for teleport).
+ */
+function activateAbility(abilityName, obstacles = []) {
     // Handle standard abilities
     if (abilityName !== 'attack') {
         const ability = jason.abilities[abilityName];
-        // Rage is a special case: if it's already active, don't allow re-use.
         if (!ability || ability.cooldownTimer > 0 || (abilityName === 'rage' && jason.isRageActive)) {
             return;
         }
 
-        // Set cooldown immediately (Rage uses its cooldown to stay disabled)
         ability.cooldownTimer = ability.cooldown; 
 
         switch (abilityName) {
             case 'dash':
                 isDashing = true;
-                jason.currentSpeed = jason.baseSpeed * 2.5; // 2.5x speed boost
+                jason.currentSpeed = jason.baseSpeed * 2.5; 
                 ability.durationTimer = ability.duration;
                 break;
             case 'vision':
@@ -635,24 +711,27 @@ function activateAbility(abilityName) {
                 ability.durationTimer = ability.duration;
                 break;
             case 'teleport':
-                // Teleport: Warp at least 300 units away
                 const oldX = jason.x;
                 const oldY = jason.y;
                 let newX, newY;
                 
                 do {
-                    newX = Math.random() * (MAP_WIDTH - jason.size);
-                    newY = Math.random() * (MAP_HEIGHT - jason.size);
-                } while (Math.sqrt(Math.pow(newX - oldX, 2) + Math.pow(newY - oldY, 2)) < 300);
+                    newX = Math.random() * (WORLD_WIDTH_P - jason.width);
+                    newY = Math.random() * (WORLD_HEIGHT_P - jason.height);
+                } while (
+                    // Check 1: Not too close to old spot
+                    Math.sqrt(Math.pow(newX - oldX, 2) + Math.pow(newY - oldY, 2)) < 300 ||
+                    // Check 2: Not inside an obstacle
+                    checkTeleportCollision(newX, newY, obstacles) 
+                );
 
                 jason.x = newX;
                 jason.y = newY;
                 break;
             case 'rage':
-                // Rage: Permanent stat increase
                 jason.isRageActive = true;
-                jason.baseSpeed *= 1.5; // 50% permanent speed boost
-                jason.currentSpeed = jason.baseSpeed; // Apply immediately
+                jason.baseSpeed *= 1.5; 
+                jason.currentSpeed = jason.baseSpeed; 
                 break;
         }
     } else {
@@ -666,16 +745,17 @@ function activateAbility(abilityName) {
 
 /**
  * Updates all ability and attack cooldowns and active durations every frame.
+ * @param {Array<object>} obstacles - List of obstacles (for teleport).
  */
-function updateAbilitiesAndAttack() {
+function updateAbilitiesAndAttack(obstacles) {
     // 1. Check hotkeys (Q, V, E, R, Spacebar)
     if (keys.q) activateAbility('dash');
     if (keys.v) activateAbility('vision');
-    if (keys.e) activateAbility('teleport');
+    if (keys.e) activateAbility('teleport', obstacles);
     if (keys.r) activateAbility('rage');
     if (keys[' ']) activateAbility('attack'); // Check attack hotkey
 
-    // 2. Update Attack Timer (NEW)
+    // 2. Update Attack Timer
     if (jason.attack.cooldownTimer > 0) {
         jason.attack.cooldownTimer--;
     }
@@ -685,20 +765,17 @@ function updateAbilitiesAndAttack() {
         jason.isAttacking = false;
     }
 
-    // 3. Update Ability Timers
+    // 3. Update Ability TimERS
     for (const abilityName in jason.abilities) {
         const ability = jason.abilities[abilityName];
         
-        // Cooldown Timer
         if (ability.cooldownTimer > 0) {
             ability.cooldownTimer--;
         }
         
-        // Duration Timer (Dash and Vision)
         if (ability.durationTimer > 0) {
             ability.durationTimer--;
             
-            // Handle duration end
             if (ability.durationTimer === 0) {
                 if (abilityName === 'dash') {
                     isDashing = false;
@@ -711,7 +788,7 @@ function updateAbilitiesAndAttack() {
         }
     }
 
-    // 4. Speed enforcement (Reset speed if all temporary boosts are off)
+    // 4. Speed enforcement
     if (!isDashing) {
         jason.currentSpeed = jason.baseSpeed;
     }
@@ -726,8 +803,10 @@ function updateAbilitiesAndAttack() {
 let canvas;
 let ctx;
 
-const MAP_WIDTH = 800;
-const MAP_HEIGHT = 800;
+const CANVAS_WIDTH = 800; // The size of the window
+const CANVAS_HEIGHT = 800;
+const WORLD_WIDTH = 2400; // The size of the actual map
+const WORLD_HEIGHT = 2400;
 
 let isGameRunning = false;
 let counselors = []; // Array to hold all AI counselors
@@ -735,18 +814,35 @@ let counselors = []; // Array to hold all AI counselors
 // Asset Storage
 let jasonSpriteImage;
 
+// NEW: Camera and Obstacles
+const camera = {
+    x: 0,
+    y: 0,
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT
+};
+
+const obstacles = [
+    { 
+        x: (WORLD_WIDTH / 2) - 75, // Centered cabin
+        y: (WORLD_HEIGHT / 2) - 75,
+        width: 150, 
+        height: 150, 
+        name: "Jason's Cabin",
+        color: '#4a342a'
+    }
+    // We can add more obstacles here (trees, rocks, other cabins)
+];
+let items = []; // Gas, Batteries, Keys; basically all stuff needed for counselors to escape
+let objectives = []; // Car, Phonebox; stuff needed to complete that allows the counselors to win
+
 
 // --- 2. Asset Loading ---
-
-/**
- * Loads all necessary game assets before starting.
- */
 function loadAssets() {
     return new Promise((resolve) => {
         jasonSpriteImage = new Image();
         // --- MANDATORY USER PATH INSTRUCTION APPLIED ---
-        jasonSpriteImage.src = 'images/sprites/jason/jason-base-spritesheet.png'; 
-        // ------------------------------------------------
+        jasonSpriteImage.src = "images/sprites/jason-base-spritesheet.png";        // ------------------------------------------------
 
         jasonSpriteImage.onload = () => {
             console.log("Jason spritesheet loaded successfully.");
@@ -754,17 +850,44 @@ function loadAssets() {
         };
         jasonSpriteImage.onerror = () => {
             console.error(`Failed to load Jason spritesheet from: ${jasonSpriteImage.src}`);
-            resolve(); // Still resolve to allow game to start, just without Jason image
+            resolve(); 
         }
     });
 }
+function getSafeSpawn(worldWidth, worldHeight, obstacles, minDistance = 100) {
+    let x, y;
+    let isSafe = false;
+    while (!isSafe) {
+        x = Math.random() * (worldWidth - 30); //Just a rough estimate of item size, might need to change it
+        y = Math.random() * (worldHeight - 30);
 
+        isSafe = true; // Assume safe
+    
+        // Check against obstacles
+        for (const obstacle of obstacles) {
+            // Check of spawn is too close to obstacle or inside
+            if (checkAABB(x, y, 30, 30, obstacle.x, obstacle.y, obstacle.width, obstacle.height)) {
+                isSafe = false;
+                break;
+            }
+        }
+    }
+    return { x, y };
+}
+function initializeWorldObjects() {
+    // 1. Make the Car Repair Items
+    const gasSpawm = getSafeSpawn(WORLD_WIDTH, WORLD_HEIGHT, obstacles);
+    items.push({
+        type: 'gas', x: gasSpawn.x, y:gasSpawn.y, size: 30, color: '#E8E40C', name: 'Gas', isCollected: false
+    });
+    const batterySpawn = getSafeSpawn(WORLD_WIDTH, WORLD_HEIGHT, obstacles);
+    items.push({
+        type: 'battery', x: batterySpawn.x, y:batterySpawn.y, size: 30, color: '#0CEC0C', name: 'Battery', isCollected: false
+    });
+    
+}
 
 // --- 3. Menu and Screen Functions (Called by index.html buttons) ---
-
-/**
- * Hides all screens and shows the one specified by ID.
- */
 window.showScreen = function(id) {
     document.querySelectorAll('.screen').forEach(screen => {
         screen.style.display = 'none';
@@ -775,76 +898,73 @@ window.showScreen = function(id) {
     }
 }
 
-/**
- * Starts the game, initializes the canvas, and begins the game loop.
- */
 window.startGame = async function(jasonId) {
-    // 1. Ensure assets are loaded before game start
     await loadAssets();
 
-    // 2. Update Game State
     jason.currentJasonId = jasonId;
     isGameRunning = true;
     
-    // 3. Initialize Canvas
+    // Initialize Canvas to fixed screen size
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
-    canvas.width = MAP_WIDTH;
-    canvas.height = MAP_HEIGHT;
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
     
-    // 4. Initialize Counselors
-    counselors = createCounselors(7, MAP_WIDTH, MAP_HEIGHT);
+    // Initialize Counselors in the WORLD
+    counselors = createCounselors(7, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // 5. Show Game Screen
     window.showScreen('game-screen');
     
-    // 6. Start the Game Loop
     gameLoop();
 }
 
 /**
  * Global function to handle ability activation from UI buttons.
  */
-window.handleAbility = activateAbility;
+window.handleAbility = (abilityName) => {
+    // Pass obstacles list when activating from UI
+    activateAbility(abilityName, obstacles);
+};
 
-// --- 4. Collision Utility (NEW) ---
+
+// --- 4. Core Game Logic (Update) ---
 
 /**
- * Checks for Axis-Aligned Bounding Box (AABB) collision between two objects.
- * Assumes objects have x, y, and size properties.
+ * Updates the camera position to follow Jason, clamped to world bounds.
  */
-function checkCollision(r1, r2) {
-    return r1.x < r2.x + r2.size &&
-           r1.x + r1.size > r2.x &&
-           r1.y < r2.y + r2.size &&
-           r1.y + r1.size > r2.y;
-}
+function updateCamera() {
+    // Center camera on Jason
+    camera.x = jason.x - (CANVAS_WIDTH / 2) + (jason.width / 2);
+    camera.y = jason.y - (CANVAS_HEIGHT / 2) + (jason.height / 2);
 
-// --- 5. Core Game Logic (Update) ---
+    // Clamp camera to world boundaries
+    camera.x = Math.max(0, Math.min(camera.x, WORLD_WIDTH - CANVAS_WIDTH));
+    camera.y = Math.max(0, Math.min(camera.y, WORLD_HEIGHT - CANVAS_HEIGHT));
+}
 
 function update() {
     if (!isGameRunning) return;
 
-    // 1. Handle Player Input and Movement
-    handlePlayerMovement(MAP_WIDTH, MAP_HEIGHT); 
+    // 1. Handle Player Input and Movement (with obstacle collision)
+    handlePlayerMovement(WORLD_WIDTH, WORLD_HEIGHT, obstacles); 
 
     // 2. Update Abilities and Attack Timers
-    updateAbilitiesAndAttack();
+    updateAbilitiesAndAttack(obstacles);
 
-    // 3. Handle Attack and Collision (NEW)
+    // 3. Handle Attack and Collision
     if (jason.isAttacking) {
-        // Define Jason's attack hitbox (slightly larger than Jason)
         const ATTACK_SIZE_BUFFER = 20; 
-        const attackHitbox = {
-            x: jason.x - ATTACK_SIZE_BUFFER / 2,
-            y: jason.y - ATTACK_SIZE_BUFFER / 2,
-            size: jason.size + ATTACK_SIZE_BUFFER
-        };
+        const attackHitboxX = jason.x - ATTACK_SIZE_BUFFER / 2;
+        const attackHitboxY = jason.y - ATTACK_SIZE_BUFFER / 2;
+        const attackHitboxW = jason.width + ATTACK_SIZE_BUFFER;
+        const attackHitboxH = jason.height + ATTACK_SIZE_BUFFER;
 
         counselors.forEach(counselor => {
-            if (counselor.isAlive && checkCollision(attackHitbox, counselor)) {
+            if (counselor.isAlive && checkAABB(
+                attackHitboxX, attackHitboxY, attackHitboxW, attackHitboxH,
+                counselor.x, counselor.y, counselor.size, counselor.size
+            )) {
                 
-                // Counselor takes damage
                 counselor.health -= 50; 
                 
                 if (counselor.health <= 0) {
@@ -857,19 +977,23 @@ function update() {
         });
     }
 
-
     // 4. Handle AI movement
     counselors.forEach(counselor => {
-        updateCounselor(counselor, MAP_WIDTH, MAP_HEIGHT);
+        updateCounselor(counselor, WORLD_WIDTH, WORLD_HEIGHT);
     });
+    
+    // 5. Update Camera Position
+    updateCamera();
 
-    // 5. Update UI
+    // 6. Update UI
     updateUI();
 }
 
-// --- 6. Drawing and Rendering ---
+// --- 5. Drawing and Rendering (NEW: Camera-aware) ---
 
 function drawJason() {
+    // Draw relative to the world, camera translation handles screen position
+    
     // Only draw the spritesheet if it loaded correctly
     if (jasonSpriteImage && jasonSpriteImage.complete && jasonSpriteImage.naturalWidth > 0) {
         const animation = JASON_ANIMATIONS[jason.direction];
@@ -881,10 +1005,10 @@ function drawJason() {
         const sw = jason.frameWidth; 
         const sh = jason.frameHeight; 
         
-        const dx = jason.x; 
-        const dy = jason.y; 
-        const dw = jason.size; 
-        const dh = jason.size * (jason.frameHeight / jason.frameWidth);
+        const dx = jason.x; // World X
+        const dy = jason.y; // World Y
+        const dw = jason.width; // Draw width
+        const dh = jason.height * (jason.frameHeight / jason.frameWidth); // Maintain aspect ratio
 
         // Draw the image frame
         ctx.drawImage(
@@ -893,22 +1017,28 @@ function drawJason() {
             dx, dy, dw, dh
         );
         
-        // Optional: Draw a red box around Jason when attacking
+        /*Optional: Draw a red box around Jason when attacking
         if (jason.isAttacking) {
              const ATTACK_SIZE_BUFFER = 20; 
              ctx.strokeStyle = '#FF0000';
              ctx.lineWidth = 4;
-             ctx.strokeRect(jason.x - ATTACK_SIZE_BUFFER/2, jason.y - ATTACK_SIZE_BUFFER/2, jason.size + ATTACK_SIZE_BUFFER, jason.size + ATTACK_SIZE_BUFFER);
-        }
+             ctx.strokeRect(
+                 jason.x - ATTACK_SIZE_BUFFER/2, 
+                 jason.y - ATTACK_SIZE_BUFFER/2, 
+                 jason.width + ATTACK_SIZE_BUFFER, 
+                 jason.height + ATTACK_SIZE_BUFFER
+             );
+        }*/
 
     } else {
         // Fallback: Draw a simple red box if image failed to load
         ctx.fillStyle = 'red';
-        ctx.fillRect(jason.x, jason.y, jason.size, jason.size);
+        ctx.fillRect(jason.x, jason.y, jason.width, jason.height);
     }
 }
 
 function drawCounselors() {
+    // Draw relative to the world
     counselors.forEach(counselor => {
         if (counselor.isAlive) {
             
@@ -916,7 +1046,6 @@ function drawCounselors() {
             if (jason.isVisionActive) {
                  ctx.strokeStyle = '#FF0000'; // Red outline
                  ctx.lineWidth = 3;
-                 // Draw the outline slightly bigger than the counselor
                  ctx.strokeRect(counselor.x - 1, counselor.y - 1, COUNSELOR_SIZE + 2, COUNSELOR_SIZE + 2);
             }
 
@@ -931,7 +1060,7 @@ function drawCounselors() {
         } else {
             // Simple drawn counselor shape (DEAD)
             ctx.fillStyle = 'var(--color-dead)'; // Grey color
-            ctx.fillRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4); // Draw a flat, small 'body'
+            ctx.fillRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4);
             ctx.strokeStyle = 'var(--color-blood)';
             ctx.lineWidth = 1;
             ctx.strokeRect(counselor.x, counselor.y + COUNSELOR_SIZE / 2, COUNSELOR_SIZE, COUNSELOR_SIZE / 4);
@@ -940,43 +1069,64 @@ function drawCounselors() {
 }
 
 function drawMap() {
-    // Clear the canvas
-    ctx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    // Draw relative to the world
     
-    // Draw the basic map background (Forest)
+    // Draw the basic map background (Forest) - BIGGER
     ctx.fillStyle = '#2c4a2a'; // Moss/Forest background
-    ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+    ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // Draw Jason's Cabin (Starting area)
-    const cabinW = 150;
-    const cabinH = 150;
-    const cabinX = (MAP_WIDTH / 2) - (cabinW / 2);
-    const cabinY = (MAP_HEIGHT / 2) - (cabinH / 2);
-    ctx.fillStyle = '#4a342a'; // Wood/Cabin color
-    ctx.fillRect(cabinX, cabinY, cabinW, cabinH);
-    
-    // Cabin Text Overlay
-    ctx.font = '16px "Press Start 2P"';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.textAlign = 'center';
-    ctx.fillText("JASON'S CABIN", MAP_WIDTH / 2, MAP_HEIGHT / 2 + 5);
+    // Draw all obstacles
+    obstacles.forEach(ob => {
+        ctx.fillStyle = ob.color; // Cabin color
+        ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+
+        // Text Overlay
+        ctx.font = '16px "Press Start 2P"';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.textAlign = 'center';
+        ctx.fillText(ob.name, ob.x + ob.width / 2, ob.y + ob.height / 2 + 5);
+    });
+
 
     // Vision Filter Overlay 
     if (jason.isVisionActive) {
-        // Apply a dark, bloody red filter over the entire map
-        ctx.fillStyle = 'rgba(136, 28, 28, 0.4)'; // var(--color-blood) with transparency
-        ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+        // Apply a dark, bloody red filter over the *entire world*
+        // This will be clipped by the camera translation
+        ctx.fillStyle = 'rgba(136, 28, 28, 0.4)'; 
+        ctx.fillRect(camera.x, camera.y, CANVAS_WIDTH, CANVAS_HEIGHT);
     }
 }
 
+/**
+ * Main rendering function, handles camera translation.
+ */
 function draw() {
+    // Clear the *visible* canvas
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // --- Save context and translate to camera position ---
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    // --- Draw all game objects in WORLD coordinates ---
     drawMap();
     drawCounselors(); 
     drawJason(); 
+    
+    // --- Restore context to draw UI elements (if any) ---
+    ctx.restore();
+    
+    // NOTE: Vision filter is now part of drawMap, but if we want it
+    // to overlay Jason, it should be here, *after* restore.
+    if (jason.isVisionActive) {
+        // This draws the filter *over* the screen, including Jason
+        ctx.fillStyle = 'rgba(136, 28, 28, 0.4)'; 
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
 }
 
 
-// --- 7. UI Update Logic ---
+// --- 6. UI Update Logic ---
 
 function updateUI() {
     // Update Health Bar (Static for now)
@@ -993,7 +1143,7 @@ function updateUI() {
         counselorCountSpan.textContent = aliveCount; 
     }
     
-    // Update Attack Button (NEW)
+    // Update Attack Button
     const updateAttackButton = () => {
         const button = document.getElementById('ability-attack');
         if (!button) return;
@@ -1036,7 +1186,10 @@ function updateUI() {
     
     updateAbilityButton('ability-dash', 'dash', 'Q');
     updateAbilityButton('ability-vision', 'vision', 'V');
-    updateAbilityButton('ability-teleport', 'teleport', 'E');
+    // --- SYNTAX ERROR FIX ---
+    // I found a syntax error here from the last edit and fixed it.
+    updateAbilityButton('ability-teleport', 'teleport', 'E'); // Was missing quotes around 'E'
+    // ------------------------
     updateAbilityButton('ability-rage', 'rage', 'R');
 
     // Update Ability Status
@@ -1052,7 +1205,7 @@ function updateUI() {
 }
 
 
-// --- 8. Main Game Loop ---
+// --- 7. Main Game Loop ---
 
 function gameLoop() {
     if (!isGameRunning) return; 
@@ -1064,7 +1217,7 @@ function gameLoop() {
 }
 
 
-// --- 9. Initialization (Start at Menu) ---
+// --- 8. Initialization (Start at Menu) ---
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Initialize input listeners from the player module
