@@ -1,7 +1,11 @@
+What we've accomplished:
 -Integrated everything into the html file cause the ai for some reason cannot do seperate files
 -Made a placeholder block for the player just to test functionality
 -Added basic counselor ai
+-Fixed Jason Spritesheet (NOT collision)
 
-
+What we need to do:
 -We need to add a bigger map - Somewhat done, just need more POI's
--We need smarter ai
+-We need smarter ai - done, kinda
+
+- Fix cabin + counselor collision
