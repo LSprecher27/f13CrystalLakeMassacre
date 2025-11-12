@@ -3,9 +3,16 @@ What we've accomplished:
 -Made a placeholder block for the player just to test functionality
 -Added basic counselor ai
 -Fixed Jason Spritesheet (NOT collision)
+-Made working abilities for Jason
+-Basic win condition
+-Menu screen
+
 
 What we need to do:
 -We need to add a bigger map - Somewhat done, just need more POI's
--We need smarter ai - done, kinda
-
+-We need smarter ai - done, kinda'
+-Better designs for counselors
+-More Jasons
+-More Locations
+-Actual Functioning car
 - Fix cabin + counselor collision
